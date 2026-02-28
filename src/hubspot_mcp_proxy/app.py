@@ -1,5 +1,6 @@
 """FastAPI application factory with async lifespan."""
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -39,13 +40,25 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     http_client = httpx.AsyncClient(timeout=30.0)
     hub_client = HubSpotClient(settings, http_client)
 
+    async def _cleanup_loop(interval: int = 300) -> None:
+        """Periodically purge expired auth states and codes."""
+        while True:
+            await asyncio.sleep(interval)
+            try:
+                await db.cleanup_expired()
+                logger.debug("Expired records cleaned up")
+            except Exception:
+                logger.exception("Cleanup task failed")
+
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         logger.info("Initializing database at %s", settings.database_path)
         await db.init()
         logger.info("Database initialized")
+        cleanup_task = asyncio.create_task(_cleanup_loop())
         yield
         logger.info("Shutting down...")
+        cleanup_task.cancel()
         await hub_client.close()
         await db.close()
         logger.info("Shutdown complete")

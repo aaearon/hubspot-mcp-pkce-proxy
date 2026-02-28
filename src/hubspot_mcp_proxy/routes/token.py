@@ -1,6 +1,7 @@
 """Token endpoint - authorization_code and refresh_token grants."""
 
 import hashlib
+import hmac
 import logging
 
 from fastapi import APIRouter, Form
@@ -23,8 +24,8 @@ def create_token_router(
         client = await db.get_client(client_id)
         if client is None:
             return None
-        expected_hash = hashlib.sha256(client_secret.encode()).hexdigest()
-        if client["client_secret_hash"] != expected_hash:
+        expected = hashlib.sha256(client_secret.encode()).hexdigest()
+        if not hmac.compare_digest(client["client_secret_hash"], expected):
             return None
         return client
 

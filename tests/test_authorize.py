@@ -55,9 +55,7 @@ class TestAuthorize:
         assert "code_challenge" in params
         assert params["code_challenge_method"] == ["S256"]
 
-    def test_authorize_stores_state(self, client, db, registered_client):
-        import asyncio
-
+    async def test_authorize_stores_state(self, client, db, registered_client):
         resp = client.get(
             "/authorize",
             params={
@@ -71,9 +69,7 @@ class TestAuthorize:
         parsed = urlparse(location)
         params = parse_qs(parsed.query)
         proxy_state = params["state"][0]
-        row = asyncio.get_event_loop().run_until_complete(
-            db.get_auth_state(proxy_state)
-        )
+        row = await db.get_auth_state(proxy_state)
         assert row is not None
         assert row["copilot_state"] == "copilot-state-123"
         assert row["code_verifier"] != ""

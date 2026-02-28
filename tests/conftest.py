@@ -4,6 +4,7 @@ import pytest
 
 from hubspot_mcp_proxy.config import Settings
 from hubspot_mcp_proxy.db import Database
+from hubspot_mcp_proxy.hub_client import HubSpotClient
 
 
 @pytest.fixture
@@ -22,3 +23,9 @@ async def db(tmp_path):
     await database.init()
     yield database
     await database.close()
+
+
+@pytest.fixture
+def hub_client(settings):
+    """Provide a HubSpotClient for testing."""
+    return HubSpotClient(settings)

@@ -45,6 +45,7 @@ class Database:
     async def init(self) -> None:
         self._db = await aiosqlite.connect(self._path)
         self._db.row_factory = aiosqlite.Row
+        await self._db.execute("PRAGMA journal_mode=WAL")
         await self._db.executescript(_SCHEMA)
 
     async def close(self) -> None:
@@ -98,8 +99,11 @@ class Database:
         await self._db.commit()
 
     async def get_auth_state(self, state_key: str) -> dict | None:
+        now = datetime.now(timezone.utc).isoformat()
         cursor = await self._db.execute(
-            "SELECT * FROM auth_states WHERE state_key = ?", (state_key,)
+            "SELECT * FROM auth_states"
+            " WHERE state_key = ? AND expires_at > ?",
+            (state_key, now),
         )
         row = await cursor.fetchone()
         return dict(row) if row else None
@@ -134,16 +138,18 @@ class Database:
         await self._db.commit()
 
     async def get_and_delete_auth_code(self, code: str) -> dict | None:
+        now = datetime.now(timezone.utc).isoformat()
         cursor = await self._db.execute(
-            "SELECT * FROM auth_codes WHERE code = ?", (code,)
+            "DELETE FROM auth_codes"
+            " WHERE code = ? AND expires_at > ?"
+            " RETURNING *",
+            (code, now),
         )
         row = await cursor.fetchone()
         if row is None:
             return None
-        result = dict(row)
-        await self._db.execute("DELETE FROM auth_codes WHERE code = ?", (code,))
         await self._db.commit()
-        return result
+        return dict(row)
 
     # --- Cleanup ---
 

@@ -2,19 +2,6 @@
 
 from datetime import datetime, timedelta, timezone
 
-import pytest
-
-from hubspot_mcp_proxy.db import Database
-
-
-@pytest.fixture
-async def db(tmp_path):
-    """Provide an initialized in-memory-like temp database."""
-    database = Database(str(tmp_path / "test.db"))
-    await database.init()
-    yield database
-    await database.close()
-
 
 class TestClients:
     async def test_insert_and_get_client(self, db):

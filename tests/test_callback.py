@@ -9,15 +9,10 @@ import respx
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from hubspot_mcp_proxy.hub_client import HubSpotClient
 from hubspot_mcp_proxy.routes.callback import create_callback_router
 
 
 class TestCallback:
-    @pytest.fixture
-    def hub_client(self, settings):
-        return HubSpotClient(settings)
-
     @pytest.fixture
     async def stored_state(self, db):
         """Insert a pending auth state."""

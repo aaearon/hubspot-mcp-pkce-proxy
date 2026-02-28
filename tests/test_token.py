@@ -10,15 +10,10 @@ import respx
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from hubspot_mcp_proxy.hub_client import HubSpotClient
 from hubspot_mcp_proxy.routes.token import create_token_router
 
 
 class TestToken:
-    @pytest.fixture
-    def hub_client(self, settings):
-        return HubSpotClient(settings)
-
     @pytest.fixture
     async def setup_client_and_code(self, db):
         """Register a client and store a proxy auth code."""

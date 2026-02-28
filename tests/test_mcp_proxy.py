@@ -1,21 +1,15 @@
 """Tests for MCP proxy endpoint."""
 
-
 import httpx
 import pytest
 import respx
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from hubspot_mcp_proxy.hub_client import HubSpotClient
 from hubspot_mcp_proxy.routes.mcp_proxy import create_mcp_router
 
 
 class TestMcpProxy:
-    @pytest.fixture
-    def hub_client(self, settings):
-        return HubSpotClient(settings)
-
     @pytest.fixture
     def client(self, settings, hub_client):
         app = FastAPI()

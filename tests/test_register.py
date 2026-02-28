@@ -38,15 +38,13 @@ class TestRegister:
         assert resp.status_code == 201
         assert resp.json()["client_name"] == "My App"
 
-    def test_register_stores_in_database(self, client, db):
-        import asyncio
-
+    async def test_register_stores_in_database(self, client, db):
         resp = client.post(
             "/register",
             json={"redirect_uris": ["https://example.com/callback"]},
         )
         client_id = resp.json()["client_id"]
-        row = asyncio.get_event_loop().run_until_complete(db.get_client(client_id))
+        row = await db.get_client(client_id)
         assert row is not None
         assert json.loads(row["redirect_uris"]) == ["https://example.com/callback"]
 
@@ -54,16 +52,12 @@ class TestRegister:
         resp = client.post("/register", json={})
         assert resp.status_code == 422
 
-    def test_register_secret_is_hashed_in_db(self, client, db):
-        import asyncio
-
+    async def test_register_secret_is_hashed_in_db(self, client, db):
         resp = client.post(
             "/register",
             json={"redirect_uris": ["https://example.com/callback"]},
         )
         data = resp.json()
-        row = asyncio.get_event_loop().run_until_complete(
-            db.get_client(data["client_id"])
-        )
+        row = await db.get_client(data["client_id"])
         # Stored hash should not equal the plaintext secret
         assert row["client_secret_hash"] != data["client_secret"]
