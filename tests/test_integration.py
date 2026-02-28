@@ -32,7 +32,8 @@ class TestIntegration:
         assert resp.json() == {"status": "ok"}
 
     def test_full_oauth_flow(self, client, settings):
-        """Complete flow: discover -> register -> authorize -> callback -> token -> mcp."""
+        """Complete flow: discover -> register -> authorize ->
+        callback -> token -> mcp."""
 
         # 1. Discover metadata
         meta = client.get("/.well-known/oauth-authorization-server").json()
@@ -123,4 +124,5 @@ class TestIntegration:
 
             # Verify the MCP request forwarded the auth header
             mcp_request = respx.calls.last.request
-            assert mcp_request.headers["authorization"] == f"Bearer {tokens['access_token']}"
+            expected = f"Bearer {tokens['access_token']}"
+            assert mcp_request.headers["authorization"] == expected

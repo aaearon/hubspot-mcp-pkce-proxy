@@ -5,9 +5,14 @@ PKCE-injecting OAuth proxy bridging HubSpot MCP (requires PKCE) and Microsoft
 Copilot Studio (no PKCE support). Python + FastAPI.
 
 ## Architecture
-- `src/hubspot_mcp_proxy/` - Application source
+- `src/hubspot_mcp_proxy/app.py` - FastAPI app factory with async lifespan
+- `src/hubspot_mcp_proxy/config.py` - Pydantic Settings (env vars)
+- `src/hubspot_mcp_proxy/db.py` - Async SQLite CRUD
+- `src/hubspot_mcp_proxy/hub_client.py` - httpx client for HubSpot APIs
+- `src/hubspot_mcp_proxy/pkce.py` - PKCE code verifier/challenge generation
+- `src/hubspot_mcp_proxy/models.py` - Pydantic request/response models
 - `src/hubspot_mcp_proxy/routes/` - FastAPI route modules
-- `tests/` - pytest test suite
+- `tests/` - pytest test suite (41 tests)
 
 ## Development
 
@@ -20,6 +25,12 @@ source .venv/bin/activate && pytest
 
 # Lint
 source .venv/bin/activate && ruff check src/ tests/
+
+# Docker build
+docker compose build
+
+# Docker run (requires .env)
+docker compose up -d
 ```
 
 ## Key Decisions
@@ -28,9 +39,25 @@ source .venv/bin/activate && ruff check src/ tests/
 - pydantic-settings for configuration
 - respx for mocking httpx in tests
 - No PKCE advertised in OAuth metadata (Copilot Studio must not see it)
+- Structured logging: INFO for flow events, WARNING for auth failures, ERROR for upstream errors, DEBUG for sensitive details
 
 ## Conventions
 - TDD: write tests before implementation
 - Feature branch workflow: `feat/<phase-name>` branches merged to `main`
 - All routes are async
-- Database operations use async context managers
+- Route modules use factory functions (`create_*_router`) for dependency injection
+
+## Endpoints
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/.well-known/oauth-authorization-server` | RFC 8414 metadata |
+| POST | `/register` | RFC 7591 DCR |
+| GET | `/authorize` | OAuth authorize (injects PKCE) |
+| GET | `/callback` | HubSpot callback (exchanges code) |
+| POST | `/token` | Token exchange / refresh |
+| POST | `/mcp` | MCP HTTP reverse proxy |
+| GET | `/health` | Health check |
+
+## Infrastructure
+- Docker on `optiplex`, Traefik reverse proxy, `media_default` network
+- Port 8100:8000, SQLite persisted via Docker volume

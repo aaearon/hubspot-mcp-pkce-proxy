@@ -1,7 +1,6 @@
 """FastAPI application factory with async lifespan."""
 
 import logging
-import os
 from contextlib import asynccontextmanager
 
 import httpx
@@ -16,7 +15,6 @@ from hubspot_mcp_proxy.routes.mcp_proxy import create_mcp_router
 from hubspot_mcp_proxy.routes.metadata import create_metadata_router
 from hubspot_mcp_proxy.routes.register import create_register_router
 from hubspot_mcp_proxy.routes.token import create_token_router
-
 
 logger = logging.getLogger(__name__)
 

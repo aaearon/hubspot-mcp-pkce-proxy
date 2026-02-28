@@ -11,7 +11,11 @@ logger = logging.getLogger(__name__)
 
 
 class HubSpotClient:
-    def __init__(self, settings: Settings, http_client: httpx.AsyncClient | None = None) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        http_client: httpx.AsyncClient | None = None,
+    ) -> None:
         self._settings = settings
         self._http = http_client or httpx.AsyncClient(timeout=30.0)
 

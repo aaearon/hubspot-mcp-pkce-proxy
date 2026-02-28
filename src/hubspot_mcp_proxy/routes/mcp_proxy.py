@@ -20,14 +20,23 @@ def create_mcp_router(hub_client: HubSpotClient) -> APIRouter:
 
         session_id = headers.get("mcp-session-id", "none")
         has_auth = "authorization" in headers
-        logger.info("MCP proxy request: session_id=%s has_auth=%s body_len=%d", session_id, has_auth, len(body))
+        logger.info(
+            "MCP proxy request: session=%s auth=%s len=%d",
+            session_id, has_auth, len(body),
+        )
         logger.debug("MCP request body: %s", body[:500])
 
         upstream = await hub_client.proxy_mcp(body, headers)
 
-        logger.info("MCP proxy response: status=%d session_id=%s", upstream.status_code, session_id)
+        logger.info(
+            "MCP proxy response: status=%d session=%s",
+            upstream.status_code, session_id,
+        )
         if upstream.status_code >= 400:
-            logger.warning("MCP upstream error: status=%d body=%s", upstream.status_code, upstream.text[:500])
+            logger.warning(
+                "MCP upstream error: status=%d body=%s",
+                upstream.status_code, upstream.text[:500],
+            )
 
         # Preserve key response headers
         response_headers = {}

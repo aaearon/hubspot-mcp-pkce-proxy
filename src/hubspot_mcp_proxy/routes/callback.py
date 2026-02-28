@@ -63,8 +63,9 @@ def create_callback_router(
 
         # Generate proxy auth code and store HubSpot tokens
         proxy_code = secrets.token_urlsafe(32)
+        ttl = settings.auth_code_ttl_seconds
         expires_at = (
-            datetime.now(timezone.utc) + timedelta(seconds=settings.auth_code_ttl_seconds)
+            datetime.now(timezone.utc) + timedelta(seconds=ttl)
         ).isoformat()
 
         await db.insert_auth_code(

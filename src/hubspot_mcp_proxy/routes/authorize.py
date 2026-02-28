@@ -39,7 +39,8 @@ def create_authorize_router(settings: Settings, db: Database) -> APIRouter:
         registered_uris = json.loads(client["redirect_uris"])
         if redirect_uri not in registered_uris:
             logger.warning(
-                "Authorize rejected: redirect_uri=%s not in registered URIs for client_id=%s",
+                "Authorize rejected: redirect_uri=%s"
+                " not in registered URIs for client_id=%s",
                 redirect_uri, client_id,
             )
             return JSONResponse({"error": "invalid redirect_uri"}, status_code=400)
@@ -50,8 +51,9 @@ def create_authorize_router(settings: Settings, db: Database) -> APIRouter:
 
         # Generate proxy state key
         proxy_state = secrets.token_urlsafe(32)
+        ttl = settings.auth_state_ttl_seconds
         expires_at = (
-            datetime.now(timezone.utc) + timedelta(seconds=settings.auth_state_ttl_seconds)
+            datetime.now(timezone.utc) + timedelta(seconds=ttl)
         ).isoformat()
 
         await db.insert_auth_state(

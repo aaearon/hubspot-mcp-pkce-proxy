@@ -1,6 +1,5 @@
 """Tests for MCP proxy endpoint."""
 
-import json
 
 import httpx
 import pytest
@@ -63,7 +62,7 @@ class TestMcpProxy:
                 headers={"mcp-session-id": "sess-123"},
             )
         )
-        resp = client.post(
+        client.post(
             "/mcp",
             json={"jsonrpc": "2.0", "id": 1, "method": "initialize"},
             headers={

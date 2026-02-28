@@ -1,0 +1,26 @@
+services:
+  hubspot-mcp-proxy:
+    build: .
+    container_name: hubspot-mcp-proxy
+    restart: unless-stopped
+    ports:
+      - "8100:8000"
+    env_file:
+      - .env
+    volumes:
+      - proxy-data:/data
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - media_default
+
+volumes:
+  proxy-data:
+
+networks:
+  media_default:
+    external: true

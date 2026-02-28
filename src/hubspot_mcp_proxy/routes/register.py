@@ -20,7 +20,10 @@ def create_register_router(db: Database) -> APIRouter:
 
     @router.post("/register", status_code=201)
     async def register(request: DCRRequest) -> JSONResponse:
-        logger.info("DCR request: client_name=%s redirect_uris=%s", request.client_name, request.redirect_uris)
+        logger.info(
+            "DCR request: client_name=%s uris=%s",
+            request.client_name, request.redirect_uris,
+        )
         client_id = str(uuid.uuid4())
         client_secret = secrets.token_urlsafe(32)
         secret_hash = hashlib.sha256(client_secret.encode()).hexdigest()
@@ -38,7 +41,10 @@ def create_register_router(db: Database) -> APIRouter:
             redirect_uris=request.redirect_uris,
             client_name=request.client_name,
         )
-        logger.info("DCR registered: client_id=%s client_name=%s", client_id, request.client_name)
+        logger.info(
+            "DCR registered: client_id=%s name=%s",
+            client_id, request.client_name,
+        )
         return JSONResponse(content=response.model_dump(), status_code=201)
 
     return router

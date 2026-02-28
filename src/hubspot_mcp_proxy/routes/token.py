@@ -37,7 +37,10 @@ def create_token_router(
         client_secret: str | None = Form(default=None),
         refresh_token: str | None = Form(default=None),
     ) -> JSONResponse:
-        logger.info("Token request: grant_type=%s client_id=%s", grant_type, client_id)
+        logger.info(
+            "Token request: grant_type=%s client_id=%s",
+            grant_type, client_id,
+        )
 
         if not client_id or not client_secret:
             logger.warning("Token rejected: missing client credentials")
@@ -45,7 +48,10 @@ def create_token_router(
 
         client = await _validate_client(client_id, client_secret)
         if client is None:
-            logger.warning("Token rejected: invalid client credentials for client_id=%s", client_id)
+            logger.warning(
+                "Token rejected: invalid creds for client_id=%s",
+                client_id,
+            )
             return JSONResponse({"error": "invalid_client"}, status_code=401)
 
         if grant_type == "authorization_code":
@@ -56,11 +62,17 @@ def create_token_router(
                 )
             auth_code = await db.get_and_delete_auth_code(code)
             if auth_code is None:
-                logger.warning("Token rejected: invalid or expired proxy code for client_id=%s", client_id)
+                logger.warning(
+                    "Token rejected: invalid/expired code"
+                    " for client_id=%s", client_id,
+                )
                 return JSONResponse(
                     {"error": "invalid_grant"}, status_code=400
                 )
-            logger.info("Token issued via authorization_code for client_id=%s", client_id)
+            logger.info(
+                "Token issued via auth_code for client_id=%s",
+                client_id,
+            )
             return JSONResponse({
                 "access_token": auth_code["access_token"],
                 "token_type": auth_code["token_type"],
@@ -71,7 +83,10 @@ def create_token_router(
         elif grant_type == "refresh_token":
             if not refresh_token:
                 return JSONResponse(
-                    {"error": "invalid_request", "error_description": "refresh_token required"},
+                    {
+                        "error": "invalid_request",
+                        "error_description": "refresh_token required",
+                    },
                     status_code=400,
                 )
             logger.info("Refreshing token via HubSpot for client_id=%s", client_id)
@@ -95,7 +110,10 @@ def create_token_router(
             })
 
         else:
-            logger.warning("Unsupported grant_type=%s from client_id=%s", grant_type, client_id)
+            logger.warning(
+                "Unsupported grant_type=%s from client_id=%s",
+                grant_type, client_id,
+            )
             return JSONResponse(
                 {"error": "unsupported_grant_type"}, status_code=400
             )

@@ -1,6 +1,5 @@
 """Tests for database layer."""
 
-import asyncio
 from datetime import datetime, timedelta, timezone
 
 import pytest

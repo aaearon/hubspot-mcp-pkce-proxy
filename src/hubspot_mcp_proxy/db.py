@@ -61,8 +61,8 @@ class Database:
         client_name: str | None = None,
     ) -> None:
         await self._db.execute(
-            "INSERT INTO clients (client_id, client_secret_hash, redirect_uris, client_name) "
-            "VALUES (?, ?, ?, ?)",
+            "INSERT INTO clients (client_id, client_secret_hash,"
+            " redirect_uris, client_name) VALUES (?, ?, ?, ?)",
             (client_id, client_secret_hash, redirect_uris, client_name),
         )
         await self._db.commit()
@@ -87,9 +87,13 @@ class Database:
         expires_at: str,
     ) -> None:
         await self._db.execute(
-            "INSERT INTO auth_states (state_key, code_verifier, client_id, redirect_uri, "
-            "copilot_state, scope, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (state_key, code_verifier, client_id, redirect_uri, copilot_state, scope, expires_at),
+            "INSERT INTO auth_states (state_key, code_verifier,"
+            " client_id, redirect_uri, copilot_state, scope,"
+            " expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                state_key, code_verifier, client_id,
+                redirect_uri, copilot_state, scope, expires_at,
+            ),
         )
         await self._db.commit()
 
@@ -119,9 +123,13 @@ class Database:
         expires_at: str,
     ) -> None:
         await self._db.execute(
-            "INSERT INTO auth_codes (code, access_token, refresh_token, token_type, "
-            "expires_in, client_id, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (code, access_token, refresh_token, token_type, expires_in, client_id, expires_at),
+            "INSERT INTO auth_codes (code, access_token,"
+            " refresh_token, token_type, expires_in, client_id,"
+            " expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                code, access_token, refresh_token,
+                token_type, expires_in, client_id, expires_at,
+            ),
         )
         await self._db.commit()
 

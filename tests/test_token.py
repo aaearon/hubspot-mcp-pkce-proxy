@@ -10,7 +10,6 @@ import respx
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from hubspot_mcp_proxy.db import Database
 from hubspot_mcp_proxy.hub_client import HubSpotClient
 from hubspot_mcp_proxy.routes.token import create_token_router
 

@@ -6,7 +6,6 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from hubspot_mcp_proxy.db import Database
 from hubspot_mcp_proxy.routes.register import create_register_router
 
 

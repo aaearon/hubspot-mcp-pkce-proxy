@@ -1,7 +1,5 @@
 """Tests for the callback endpoint."""
 
-import hashlib
-import json
 from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qs, urlparse
 
@@ -11,7 +9,6 @@ import respx
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from hubspot_mcp_proxy.db import Database
 from hubspot_mcp_proxy.hub_client import HubSpotClient
 from hubspot_mcp_proxy.routes.callback import create_callback_router
 
@@ -19,7 +16,6 @@ from hubspot_mcp_proxy.routes.callback import create_callback_router
 class TestCallback:
     @pytest.fixture
     def hub_client(self, settings):
-        transport = httpx.AsyncClient(transport=httpx.MockTransport(lambda r: None))
         return HubSpotClient(settings)
 
     @pytest.fixture
