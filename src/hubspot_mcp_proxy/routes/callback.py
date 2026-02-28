@@ -1,0 +1,70 @@
+"""OAuth callback endpoint - receives HubSpot auth code, exchanges for tokens."""
+
+import secrets
+from datetime import datetime, timedelta, timezone
+from urllib.parse import urlencode
+
+from fastapi import APIRouter, Query
+from fastapi.responses import JSONResponse, RedirectResponse
+from starlette.responses import Response
+
+from hubspot_mcp_proxy.config import Settings
+from hubspot_mcp_proxy.db import Database
+from hubspot_mcp_proxy.hub_client import HubSpotClient
+
+
+def create_callback_router(
+    settings: Settings, db: Database, hub_client: HubSpotClient
+) -> APIRouter:
+    router = APIRouter()
+
+    @router.get("/callback", response_model=None)
+    async def callback(
+        code: str = Query(),
+        state: str = Query(),
+    ) -> Response:
+        # Look up the proxy auth state
+        auth_state = await db.get_auth_state(state)
+        if auth_state is None:
+            return JSONResponse({"error": "unknown or expired state"}, status_code=400)
+
+        # Exchange with HubSpot using PKCE verifier
+        result = await hub_client.exchange_code(
+            code=code,
+            code_verifier=auth_state["code_verifier"],
+            redirect_uri=f"{settings.proxy_base_url}/callback",
+        )
+
+        # Clean up used state
+        await db.delete_auth_state(state)
+
+        if result["status_code"] != 200:
+            return JSONResponse(
+                {"error": "hubspot token exchange failed", "detail": result["data"]},
+                status_code=502,
+            )
+
+        token_data = result["data"]
+
+        # Generate proxy auth code and store HubSpot tokens
+        proxy_code = secrets.token_urlsafe(32)
+        expires_at = (
+            datetime.now(timezone.utc) + timedelta(seconds=settings.auth_code_ttl_seconds)
+        ).isoformat()
+
+        await db.insert_auth_code(
+            code=proxy_code,
+            access_token=token_data["access_token"],
+            refresh_token=token_data.get("refresh_token"),
+            token_type=token_data.get("token_type", "bearer"),
+            expires_in=token_data.get("expires_in"),
+            client_id=auth_state["client_id"],
+            expires_at=expires_at,
+        )
+
+        # Redirect back to Copilot Studio with proxy code
+        params = {"code": proxy_code, "state": auth_state["copilot_state"]}
+        redirect_url = f"{auth_state['redirect_uri']}?{urlencode(params)}"
+        return RedirectResponse(url=redirect_url, status_code=307)
+
+    return router
