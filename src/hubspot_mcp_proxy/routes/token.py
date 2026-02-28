@@ -1,6 +1,7 @@
 """Token endpoint - authorization_code and refresh_token grants."""
 
 import hashlib
+import logging
 
 from fastapi import APIRouter, Form
 from fastapi.responses import JSONResponse
@@ -8,6 +9,8 @@ from fastapi.responses import JSONResponse
 from hubspot_mcp_proxy.config import Settings
 from hubspot_mcp_proxy.db import Database
 from hubspot_mcp_proxy.hub_client import HubSpotClient
+
+logger = logging.getLogger(__name__)
 
 
 def create_token_router(
@@ -34,11 +37,15 @@ def create_token_router(
         client_secret: str | None = Form(default=None),
         refresh_token: str | None = Form(default=None),
     ) -> JSONResponse:
+        logger.info("Token request: grant_type=%s client_id=%s", grant_type, client_id)
+
         if not client_id or not client_secret:
+            logger.warning("Token rejected: missing client credentials")
             return JSONResponse({"error": "invalid_client"}, status_code=401)
 
         client = await _validate_client(client_id, client_secret)
         if client is None:
+            logger.warning("Token rejected: invalid client credentials for client_id=%s", client_id)
             return JSONResponse({"error": "invalid_client"}, status_code=401)
 
         if grant_type == "authorization_code":
@@ -49,9 +56,11 @@ def create_token_router(
                 )
             auth_code = await db.get_and_delete_auth_code(code)
             if auth_code is None:
+                logger.warning("Token rejected: invalid or expired proxy code for client_id=%s", client_id)
                 return JSONResponse(
                     {"error": "invalid_grant"}, status_code=400
                 )
+            logger.info("Token issued via authorization_code for client_id=%s", client_id)
             return JSONResponse({
                 "access_token": auth_code["access_token"],
                 "token_type": auth_code["token_type"],
@@ -65,13 +74,19 @@ def create_token_router(
                     {"error": "invalid_request", "error_description": "refresh_token required"},
                     status_code=400,
                 )
+            logger.info("Refreshing token via HubSpot for client_id=%s", client_id)
             result = await hub_client.refresh_token(refresh_token)
             if result["status_code"] != 200:
+                logger.error(
+                    "HubSpot refresh failed: status=%d response=%s",
+                    result["status_code"], result["data"],
+                )
                 return JSONResponse(
                     {"error": "invalid_grant", "detail": result["data"]},
                     status_code=result["status_code"],
                 )
             data = result["data"]
+            logger.info("Token refreshed successfully for client_id=%s", client_id)
             return JSONResponse({
                 "access_token": data["access_token"],
                 "token_type": data.get("token_type", "bearer"),
@@ -80,6 +95,7 @@ def create_token_router(
             })
 
         else:
+            logger.warning("Unsupported grant_type=%s from client_id=%s", grant_type, client_id)
             return JSONResponse(
                 {"error": "unsupported_grant_type"}, status_code=400
             )

@@ -1,5 +1,6 @@
 """OAuth callback endpoint - receives HubSpot auth code, exchanges for tokens."""
 
+import logging
 import secrets
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
@@ -12,6 +13,8 @@ from hubspot_mcp_proxy.config import Settings
 from hubspot_mcp_proxy.db import Database
 from hubspot_mcp_proxy.hub_client import HubSpotClient
 
+logger = logging.getLogger(__name__)
+
 
 def create_callback_router(
     settings: Settings, db: Database, hub_client: HubSpotClient
@@ -23,10 +26,18 @@ def create_callback_router(
         code: str = Query(),
         state: str = Query(),
     ) -> Response:
+        logger.info("Callback received: state=%s", state)
+
         # Look up the proxy auth state
         auth_state = await db.get_auth_state(state)
         if auth_state is None:
+            logger.warning("Callback rejected: unknown or expired state=%s", state)
             return JSONResponse({"error": "unknown or expired state"}, status_code=400)
+
+        logger.info(
+            "Callback exchanging code with HubSpot: client_id=%s",
+            auth_state["client_id"],
+        )
 
         # Exchange with HubSpot using PKCE verifier
         result = await hub_client.exchange_code(
@@ -39,6 +50,10 @@ def create_callback_router(
         await db.delete_auth_state(state)
 
         if result["status_code"] != 200:
+            logger.error(
+                "HubSpot token exchange failed: status=%d response=%s",
+                result["status_code"], result["data"],
+            )
             return JSONResponse(
                 {"error": "hubspot token exchange failed", "detail": result["data"]},
                 status_code=502,
@@ -65,6 +80,10 @@ def create_callback_router(
         # Redirect back to Copilot Studio with proxy code
         params = {"code": proxy_code, "state": auth_state["copilot_state"]}
         redirect_url = f"{auth_state['redirect_uri']}?{urlencode(params)}"
+        logger.info(
+            "Callback success: issuing proxy code for client_id=%s, redirecting to %s",
+            auth_state["client_id"], auth_state["redirect_uri"],
+        )
         return RedirectResponse(url=redirect_url, status_code=307)
 
     return router

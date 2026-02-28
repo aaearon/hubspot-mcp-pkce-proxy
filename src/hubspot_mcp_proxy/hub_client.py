@@ -1,10 +1,13 @@
 """HTTP client for HubSpot API calls."""
 
+import logging
 from typing import Any
 
 import httpx
 
 from hubspot_mcp_proxy.config import Settings
+
+logger = logging.getLogger(__name__)
 
 
 class HubSpotClient:
@@ -16,6 +19,7 @@ class HubSpotClient:
         self, code: str, code_verifier: str, redirect_uri: str
     ) -> dict[str, Any]:
         """Exchange authorization code + PKCE verifier for tokens."""
+        logger.debug("HubSpot exchange_code: redirect_uri=%s", redirect_uri)
         resp = await self._http.post(
             self._settings.hubspot_token_url,
             data={
@@ -27,10 +31,12 @@ class HubSpotClient:
                 "code_verifier": code_verifier,
             },
         )
+        logger.debug("HubSpot exchange_code response: status=%d", resp.status_code)
         return {"status_code": resp.status_code, "data": resp.json()}
 
     async def refresh_token(self, refresh_token: str) -> dict[str, Any]:
         """Refresh an access token using HubSpot's client credentials."""
+        logger.debug("HubSpot refresh_token request")
         resp = await self._http.post(
             self._settings.hubspot_token_url,
             data={
@@ -40,6 +46,7 @@ class HubSpotClient:
                 "refresh_token": refresh_token,
             },
         )
+        logger.debug("HubSpot refresh_token response: status=%d", resp.status_code)
         return {"status_code": resp.status_code, "data": resp.json()}
 
     async def proxy_mcp(
@@ -51,6 +58,7 @@ class HubSpotClient:
             if key in headers:
                 forward_headers[key] = headers[key]
 
+        logger.debug("HubSpot MCP proxy: url=%s", self._settings.hubspot_mcp_url)
         return await self._http.post(
             self._settings.hubspot_mcp_url,
             content=body,

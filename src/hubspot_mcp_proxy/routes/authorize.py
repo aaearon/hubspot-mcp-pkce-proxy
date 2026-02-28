@@ -1,6 +1,7 @@
 """OAuth authorize endpoint - injects PKCE and redirects to HubSpot."""
 
 import json
+import logging
 import secrets
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
@@ -12,6 +13,8 @@ from starlette.responses import Response
 from hubspot_mcp_proxy.config import Settings
 from hubspot_mcp_proxy.db import Database
 from hubspot_mcp_proxy.pkce import generate_code_challenge, generate_code_verifier
+
+logger = logging.getLogger(__name__)
 
 
 def create_authorize_router(settings: Settings, db: Database) -> APIRouter:
@@ -25,13 +28,20 @@ def create_authorize_router(settings: Settings, db: Database) -> APIRouter:
         state: str = Query(),
         scope: str | None = Query(default=None),
     ) -> Response:
+        logger.info("Authorize request: client_id=%s scope=%s", client_id, scope)
+
         # Validate client registration
         client = await db.get_client(client_id)
         if client is None:
+            logger.warning("Authorize rejected: unknown client_id=%s", client_id)
             return JSONResponse({"error": "unknown client_id"}, status_code=400)
 
         registered_uris = json.loads(client["redirect_uris"])
         if redirect_uri not in registered_uris:
+            logger.warning(
+                "Authorize rejected: redirect_uri=%s not in registered URIs for client_id=%s",
+                redirect_uri, client_id,
+            )
             return JSONResponse({"error": "invalid redirect_uri"}, status_code=400)
 
         # Generate PKCE pair
@@ -67,6 +77,11 @@ def create_authorize_router(settings: Settings, db: Database) -> APIRouter:
             params["scope"] = scope
 
         hubspot_url = f"{settings.hubspot_auth_url}?{urlencode(params)}"
+        logger.info(
+            "Authorize redirecting to HubSpot: client_id=%s proxy_state=%s",
+            client_id, proxy_state,
+        )
+        logger.debug("HubSpot authorize URL: %s", hubspot_url)
         return RedirectResponse(url=hubspot_url, status_code=307)
 
     return router
