@@ -18,6 +18,11 @@ class TestIntegration:
         monkeypatch.setenv("HUBSPOT_CLIENT_SECRET", "hs-client-secret")
         monkeypatch.setenv("PROXY_BASE_URL", "https://proxy.example.com")
         monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "integration.db"))
+        monkeypatch.setenv("REGISTRATION_TOKEN", "test-reg-token")
+        monkeypatch.setenv(
+            "TOKEN_ENCRYPTION_KEY",
+            "imk_7pWm4NQntQwKYk93wRJh362s6Fsmtph6u_JcTeU=",
+        )
         return Settings()
 
     @pytest.fixture
@@ -46,6 +51,7 @@ class TestIntegration:
                 "redirect_uris": ["https://copilot.example.com/callback"],
                 "client_name": "Integration Test",
             },
+            headers={"Authorization": "Bearer test-reg-token"},
         ).json()
         dcr_client_id = reg["client_id"]
         dcr_client_secret = reg["client_secret"]
@@ -126,3 +132,39 @@ class TestIntegration:
             mcp_request = respx.calls.last.request
             expected = f"Bearer {tokens['access_token']}"
             assert mcp_request.headers["authorization"] == expected
+
+    def test_register_rejects_without_auth(self, client):
+        """Integration: /register without Bearer token returns 401."""
+        resp = client.post(
+            "/register",
+            json={"redirect_uris": ["https://example.com/cb"]},
+        )
+        assert resp.status_code == 401
+
+    def test_mcp_rejects_without_auth(self, client):
+        """Integration: /mcp without Authorization header returns 401."""
+        resp = client.post(
+            "/mcp",
+            json={"jsonrpc": "2.0", "id": 1, "method": "initialize"},
+        )
+        assert resp.status_code == 401
+
+    def test_authorize_rejects_implicit_grant(self, client, settings):
+        """Integration: response_type=token is rejected at /authorize."""
+        # First register a client
+        reg = client.post(
+            "/register",
+            json={"redirect_uris": ["https://example.com/cb"]},
+            headers={"Authorization": "Bearer test-reg-token"},
+        ).json()
+        resp = client.get(
+            "/authorize",
+            params={
+                "client_id": reg["client_id"],
+                "redirect_uri": "https://example.com/cb",
+                "response_type": "token",
+                "state": "test-state",
+            },
+        )
+        assert resp.status_code == 400
+        assert resp.json()["error"] == "unsupported_response_type"

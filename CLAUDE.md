@@ -7,12 +7,13 @@ Copilot Studio (no PKCE support). Python + FastAPI.
 ## Architecture
 - `src/hubspot_mcp_proxy/app.py` - FastAPI app factory with async lifespan
 - `src/hubspot_mcp_proxy/config.py` - Pydantic Settings (env vars)
+- `src/hubspot_mcp_proxy/crypto.py` - Fernet token encryption + scrypt secret hashing
 - `src/hubspot_mcp_proxy/db.py` - Async SQLite CRUD
 - `src/hubspot_mcp_proxy/hub_client.py` - httpx client for HubSpot APIs
 - `src/hubspot_mcp_proxy/pkce.py` - PKCE code verifier/challenge generation
 - `src/hubspot_mcp_proxy/models.py` - Pydantic request/response models
 - `src/hubspot_mcp_proxy/routes/` - FastAPI route modules
-- `tests/` - pytest test suite (44 tests)
+- `tests/` - pytest test suite (70 tests)
 
 ## Development
 
@@ -40,6 +41,12 @@ docker compose up -d
 - respx for mocking httpx in tests
 - No PKCE advertised in OAuth metadata (Copilot Studio must not see it)
 - Structured logging: INFO for flow events, WARNING for auth failures, ERROR for upstream errors, DEBUG for sensitive details
+- Fernet (AES-128-CBC + HMAC-SHA256) for encrypting tokens at rest in SQLite
+- scrypt (n=16384, r=8, p=1) for hashing client secrets, with SHA-256 legacy fallback
+- Bearer token required for DCR `/register` endpoint
+- Authorization header required for MCP proxy endpoints
+- State parameter validated against `[A-Za-z0-9_\-\.~]{1,512}` pattern
+- Only `response_type=code` accepted (implicit grant rejected)
 
 ## Conventions
 - TDD: write tests before implementation
@@ -51,21 +58,21 @@ docker compose up -d
 | Method | Path | Purpose |
 |--------|------|---------|
 | GET | `/.well-known/oauth-authorization-server` | RFC 8414 metadata |
-| POST | `/register` | RFC 7591 DCR |
+| POST | `/register` | RFC 7591 DCR (requires Bearer token) |
 | GET | `/authorize` | OAuth authorize (injects PKCE) |
-| GET | `/callback` | HubSpot callback (exchanges code) |
+| GET | `/callback` | HubSpot callback (exchanges code, handles errors) |
 | POST | `/token` | Token exchange / refresh |
-| POST | `/mcp` | MCP HTTP reverse proxy |
+| POST | `/mcp` | MCP HTTP reverse proxy (requires Authorization) |
 | GET | `/health` | Health check |
 
 ## Infrastructure
 - **Domain**: `hmcp.ams.iosharp.com` (via Traefik TLS with Let's Encrypt)
 - **Host**: `optiplex:/home/tim/hubspot-mcp-pkce-proxy`
-- **Port**: 8100 (host) → 8000 (container)
+- **Port**: 8100 (host) -> 8000 (container)
 - **Network**: `media_default` (external, shared with Traefik)
-- **Volume**: `proxy-data` → `/data` (SQLite persistence)
+- **Volume**: `proxy-data` -> `/data` (SQLite persistence)
 - **Traefik config**: `optiplex:/home/tim/media/appdata/traefik/dynamic/hubspot-mcp.yml`
-- Includes `strip-trailing-slash` middleware for `/mcp/` → `/mcp` redirect
+- Includes `strip-trailing-slash` middleware for `/mcp/` -> `/mcp` redirect
 
 ### Deployment
 ```bash
@@ -81,3 +88,36 @@ ssh.exe optiplex "sudo docker compose -f /home/tim/hubspot-mcp-pkce-proxy/docker
 ssh.exe optiplex "sudo docker ps --filter name=hubspot-mcp-proxy"
 ssh.exe optiplex "curl -s http://localhost:8100/health"
 ```
+
+## Migration Guide (for LLMs and operators deploying updates)
+
+### Breaking Changes (Security Hardening Release)
+
+**Two new required environment variables** - the service will NOT start without them:
+
+| Variable | Purpose | Generate with |
+|----------|---------|---------------|
+| `REGISTRATION_TOKEN` | Bearer token for `POST /register` | `python3 -c "import secrets; print(secrets.token_urlsafe(32))"` |
+| `TOKEN_ENCRYPTION_KEY` | Fernet key for encrypting tokens at rest | `python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` |
+
+**Endpoint authentication changes:**
+- `POST /register` now requires `Authorization: Bearer <REGISTRATION_TOKEN>` header. Requests without it return 401.
+- `POST /mcp` and `POST /` now require an `Authorization` header. Requests without one return 401. Copilot Studio already sends this, so no client changes needed.
+
+**Input validation on `/authorize`:**
+- `response_type` must be `code` (implicit grant `token` is rejected with 400)
+- `state` must match `[A-Za-z0-9_\-\.~]{1,512}` (rejects HTML/script injection, length > 512)
+
+### Migration Steps
+
+1. Generate both new env vars and add them to `.env` on the host
+2. Stop the old container: `docker compose down`
+3. Wait 10 minutes (allows in-flight auth_states/auth_codes to expire - they cannot be decrypted by the new instance since they were stored unencrypted)
+4. Rebuild and start: `docker compose up -d --build`
+5. Verify health: `curl http://localhost:8100/health`
+6. If Copilot Studio needs to re-register: `curl -X POST https://<domain>/register -H "Authorization: Bearer <REGISTRATION_TOKEN>" -H "Content-Type: application/json" -d '{"redirect_uris": ["..."], "client_name": "..."}'`
+
+### Backward Compatibility
+- **Client secret hashing**: Existing clients with SHA-256 hashes continue to work (legacy fallback in `verify_client_secret`). New registrations use scrypt.
+- **OAuth callback errors**: HubSpot OAuth errors (e.g., `access_denied`) are now properly forwarded to the client's redirect_uri instead of returning a raw 400.
+- **New dependency**: `cryptography>=44.0` added to `pyproject.toml`.

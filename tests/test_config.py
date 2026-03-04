@@ -20,6 +20,8 @@ class TestSettings:
         monkeypatch.setenv("HUBSPOT_CLIENT_ID", "test-id")
         monkeypatch.setenv("HUBSPOT_CLIENT_SECRET", "test-secret")
         monkeypatch.setenv("PROXY_BASE_URL", "https://proxy.example.com")
+        monkeypatch.setenv("REGISTRATION_TOKEN", "test-token")
+        monkeypatch.setenv("TOKEN_ENCRYPTION_KEY", "test-key")
         s = Settings()
         assert s.hubspot_client_id == "test-id"
         assert s.hubspot_client_secret == "test-secret"
@@ -37,6 +39,8 @@ class TestSettings:
         monkeypatch.setenv("HUBSPOT_CLIENT_ID", "custom-id")
         monkeypatch.setenv("HUBSPOT_CLIENT_SECRET", "custom-secret")
         monkeypatch.setenv("PROXY_BASE_URL", "https://custom.example.com")
+        monkeypatch.setenv("REGISTRATION_TOKEN", "custom-token")
+        monkeypatch.setenv("TOKEN_ENCRYPTION_KEY", "custom-key")
         monkeypatch.setenv("DATABASE_PATH", "/tmp/test.db")
         monkeypatch.setenv("AUTH_STATE_TTL_SECONDS", "120")
         monkeypatch.setenv("LOG_LEVEL", "DEBUG")

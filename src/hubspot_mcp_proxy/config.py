@@ -15,3 +15,5 @@ class Settings(BaseSettings):
     auth_state_ttl_seconds: int = 600
     auth_code_ttl_seconds: int = 300
     log_level: str = "INFO"
+    registration_token: str
+    token_encryption_key: str

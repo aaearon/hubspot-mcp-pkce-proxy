@@ -2,6 +2,7 @@
 
 import json
 import logging
+import re
 import secrets
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
@@ -11,13 +12,18 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from starlette.responses import Response
 
 from hubspot_mcp_proxy.config import Settings
+from hubspot_mcp_proxy.crypto import TokenEncryptor
 from hubspot_mcp_proxy.db import Database
 from hubspot_mcp_proxy.pkce import generate_code_challenge, generate_code_verifier
 
 logger = logging.getLogger(__name__)
 
+_STATE_PATTERN = re.compile(r"^[A-Za-z0-9_\-\.~]{1,512}$")
 
-def create_authorize_router(settings: Settings, db: Database) -> APIRouter:
+
+def create_authorize_router(
+    settings: Settings, db: Database, encryptor: TokenEncryptor
+) -> APIRouter:
     router = APIRouter()
 
     @router.get("/authorize", response_model=None)
@@ -29,6 +35,20 @@ def create_authorize_router(settings: Settings, db: Database) -> APIRouter:
         scope: str | None = Query(default=None),
     ) -> Response:
         logger.info("Authorize request: client_id=%s scope=%s", client_id, scope)
+
+        # Validate response_type
+        if response_type != "code":
+            logger.warning(
+                "Authorize rejected: unsupported response_type=%s", response_type
+            )
+            return JSONResponse(
+                {"error": "unsupported_response_type"}, status_code=400
+            )
+
+        # Validate state format
+        if not _STATE_PATTERN.match(state):
+            logger.warning("Authorize rejected: invalid state format")
+            return JSONResponse({"error": "invalid state"}, status_code=400)
 
         # Validate client registration
         client = await db.get_client(client_id)
@@ -58,7 +78,7 @@ def create_authorize_router(settings: Settings, db: Database) -> APIRouter:
 
         await db.insert_auth_state(
             state_key=proxy_state,
-            code_verifier=code_verifier,
+            code_verifier=encryptor.encrypt(code_verifier),
             client_id=client_id,
             redirect_uri=redirect_uri,
             copilot_state=state,
