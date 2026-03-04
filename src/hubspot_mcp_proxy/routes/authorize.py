@@ -84,6 +84,6 @@ def create_authorize_router(settings: Settings, db: Database) -> APIRouter:
             client_id, proxy_state,
         )
         logger.debug("HubSpot authorize URL: %s", hubspot_url)
-        return RedirectResponse(url=hubspot_url, status_code=307)
+        return RedirectResponse(url=hubspot_url, status_code=302)
 
     return router

@@ -61,7 +61,7 @@ class TestIntegration:
                 "scope": "crm.objects.contacts.read",
             },
         )
-        assert auth_resp.status_code == 307
+        assert auth_resp.status_code == 302
         hubspot_url = urlparse(auth_resp.headers["location"])
         hubspot_params = parse_qs(hubspot_url.query)
         assert hubspot_params["code_challenge_method"] == ["S256"]
@@ -85,7 +85,7 @@ class TestIntegration:
                 "/callback",
                 params={"code": "hubspot-auth-code-123", "state": proxy_state},
             )
-        assert callback_resp.status_code == 307
+        assert callback_resp.status_code == 302
         copilot_redirect = urlparse(callback_resp.headers["location"])
         copilot_params = parse_qs(copilot_redirect.query)
         assert copilot_params["state"] == ["copilot-state-abc"]

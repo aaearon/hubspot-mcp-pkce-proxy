@@ -14,6 +14,7 @@ def create_mcp_router(hub_client: HubSpotClient) -> APIRouter:
     router = APIRouter()
 
     @router.post("/mcp")
+    @router.post("/")
     async def mcp_proxy(request: Request) -> Response:
         body = await request.body()
         headers = {k: v for k, v in request.headers.items()}

@@ -12,7 +12,7 @@ Copilot Studio (no PKCE support). Python + FastAPI.
 - `src/hubspot_mcp_proxy/pkce.py` - PKCE code verifier/challenge generation
 - `src/hubspot_mcp_proxy/models.py` - Pydantic request/response models
 - `src/hubspot_mcp_proxy/routes/` - FastAPI route modules
-- `tests/` - pytest test suite (41 tests)
+- `tests/` - pytest test suite (44 tests)
 
 ## Development
 
@@ -59,5 +59,25 @@ docker compose up -d
 | GET | `/health` | Health check |
 
 ## Infrastructure
-- Docker on `optiplex`, Traefik reverse proxy, `media_default` network
-- Port 8100:8000, SQLite persisted via Docker volume
+- **Domain**: `hmcp.ams.iosharp.com` (via Traefik TLS with Let's Encrypt)
+- **Host**: `optiplex:/home/tim/hubspot-mcp-pkce-proxy`
+- **Port**: 8100 (host) → 8000 (container)
+- **Network**: `media_default` (external, shared with Traefik)
+- **Volume**: `proxy-data` → `/data` (SQLite persistence)
+- **Traefik config**: `optiplex:/home/tim/media/appdata/traefik/dynamic/hubspot-mcp.yml`
+- Includes `strip-trailing-slash` middleware for `/mcp/` → `/mcp` redirect
+
+### Deployment
+```bash
+# Sync code to optiplex (from WSL2)
+rsync -avz --exclude='.venv' --exclude='__pycache__' --exclude='.pytest_cache' \
+  --exclude='*.egg-info' --exclude='.env' --exclude='.ruff_cache' --exclude='.git' \
+  -e ssh.exe . optiplex:/home/tim/hubspot-mcp-pkce-proxy/
+
+# Build and start
+ssh.exe optiplex "sudo docker compose -f /home/tim/hubspot-mcp-pkce-proxy/docker-compose.yml up -d --build"
+
+# Check status
+ssh.exe optiplex "sudo docker ps --filter name=hubspot-mcp-proxy"
+ssh.exe optiplex "curl -s http://localhost:8100/health"
+```

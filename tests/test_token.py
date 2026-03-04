@@ -121,6 +121,29 @@ class TestToken:
         assert resp.status_code == 200
         assert resp.json()["access_token"] == "new-access-token"
 
+    @respx.mock
+    def test_refresh_token_hubspot_error_no_detail(
+        self, client, settings, setup_client_and_code
+    ):
+        """Upstream error responses must not leak HubSpot detail to clients."""
+        info = setup_client_and_code
+        respx.post(settings.hubspot_token_url).mock(
+            return_value=httpx.Response(
+                401, json={"message": "Invalid refresh token", "correlationId": "abc"}
+            )
+        )
+        resp = client.post(
+            "/token",
+            data={
+                "grant_type": "refresh_token",
+                "refresh_token": "bad-token",
+                "client_id": info["client_id"],
+                "client_secret": info["client_secret"],
+            },
+        )
+        assert resp.status_code == 502
+        assert "detail" not in resp.json()
+
     def test_unsupported_grant_type(self, client, setup_client_and_code):
         info = setup_client_and_code
         resp = client.post(
@@ -132,3 +155,46 @@ class TestToken:
             },
         )
         assert resp.status_code == 400
+
+    async def test_auth_code_client_id_mismatch(
+        self, client, db, setup_client_and_code
+    ):
+        """Auth code issued for client A cannot be redeemed by client B."""
+        info = setup_client_and_code
+        # Register a second client
+        other_secret = "other-client-secret"
+        other_hash = hashlib.sha256(other_secret.encode()).hexdigest()
+        await db.insert_client(
+            client_id="other-client-id",
+            client_secret_hash=other_hash,
+            redirect_uris=json.dumps(["https://other.example.com/callback"]),
+        )
+        # Try to redeem client A's code with client B's credentials
+        resp = client.post(
+            "/token",
+            data={
+                "grant_type": "authorization_code",
+                "code": info["code"],
+                "client_id": "other-client-id",
+                "client_secret": other_secret,
+                "redirect_uri": "https://other.example.com/callback",
+            },
+        )
+        assert resp.status_code == 400
+        assert resp.json()["error"] == "invalid_grant"
+
+    def test_token_response_cache_control(self, client, setup_client_and_code):
+        """Token responses must include Cache-Control: no-store (RFC 6749)."""
+        info = setup_client_and_code
+        resp = client.post(
+            "/token",
+            data={
+                "grant_type": "authorization_code",
+                "code": info["code"],
+                "client_id": info["client_id"],
+                "client_secret": info["client_secret"],
+                "redirect_uri": "https://copilot.example.com/callback",
+            },
+        )
+        assert resp.status_code == 200
+        assert resp.headers.get("cache-control") == "no-store"

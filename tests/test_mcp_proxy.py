@@ -69,6 +69,20 @@ class TestMcpProxy:
         assert request.headers["mcp-session-id"] == "sess-123"
 
     @respx.mock
+    def test_proxy_root_path(self, client, settings):
+        mcp_response = {"jsonrpc": "2.0", "id": 1, "result": {"capabilities": {}}}
+        respx.post(settings.hubspot_mcp_url).mock(
+            return_value=httpx.Response(200, json=mcp_response)
+        )
+        resp = client.post(
+            "/",
+            json={"jsonrpc": "2.0", "id": 1, "method": "initialize"},
+            headers={"Authorization": "Bearer test-token"},
+        )
+        assert resp.status_code == 200
+        assert resp.json() == mcp_response
+
+    @respx.mock
     def test_proxy_returns_hubspot_error(self, client, settings):
         respx.post(settings.hubspot_mcp_url).mock(
             return_value=httpx.Response(401, json={"error": "unauthorized"})

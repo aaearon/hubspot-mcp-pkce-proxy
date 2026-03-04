@@ -44,7 +44,7 @@ class TestAuthorize:
                 "scope": "crm.objects.contacts.read",
             },
         )
-        assert resp.status_code == 307
+        assert resp.status_code == 302
         location = resp.headers["location"]
         parsed = urlparse(location)
         params = parse_qs(parsed.query)

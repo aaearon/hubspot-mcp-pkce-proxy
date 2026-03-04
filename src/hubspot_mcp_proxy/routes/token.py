@@ -70,16 +70,28 @@ def create_token_router(
                 return JSONResponse(
                     {"error": "invalid_grant"}, status_code=400
                 )
+            if auth_code["client_id"] != client_id:
+                logger.warning(
+                    "Token rejected: code client_id mismatch:"
+                    " expected=%s got=%s",
+                    auth_code["client_id"], client_id,
+                )
+                return JSONResponse(
+                    {"error": "invalid_grant"}, status_code=400
+                )
             logger.info(
                 "Token issued via auth_code for client_id=%s",
                 client_id,
             )
-            return JSONResponse({
-                "access_token": auth_code["access_token"],
-                "token_type": auth_code["token_type"],
-                "expires_in": auth_code["expires_in"],
-                "refresh_token": auth_code["refresh_token"],
-            })
+            return JSONResponse(
+                {
+                    "access_token": auth_code["access_token"],
+                    "token_type": auth_code["token_type"],
+                    "expires_in": auth_code["expires_in"],
+                    "refresh_token": auth_code["refresh_token"],
+                },
+                headers={"Cache-Control": "no-store"},
+            )
 
         elif grant_type == "refresh_token":
             if not refresh_token:
@@ -98,17 +110,20 @@ def create_token_router(
                     result["status_code"], result["data"],
                 )
                 return JSONResponse(
-                    {"error": "invalid_grant", "detail": result["data"]},
-                    status_code=result["status_code"],
+                    {"error": "invalid_grant"},
+                    status_code=502,
                 )
             data = result["data"]
             logger.info("Token refreshed successfully for client_id=%s", client_id)
-            return JSONResponse({
-                "access_token": data["access_token"],
-                "token_type": data.get("token_type", "bearer"),
-                "expires_in": data.get("expires_in"),
-                "refresh_token": data.get("refresh_token"),
-            })
+            return JSONResponse(
+                {
+                    "access_token": data["access_token"],
+                    "token_type": data.get("token_type", "bearer"),
+                    "expires_in": data.get("expires_in"),
+                    "refresh_token": data.get("refresh_token"),
+                },
+                headers={"Cache-Control": "no-store"},
+            )
 
         else:
             logger.warning(

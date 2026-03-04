@@ -55,7 +55,7 @@ def create_callback_router(
                 result["status_code"], result["data"],
             )
             return JSONResponse(
-                {"error": "hubspot token exchange failed", "detail": result["data"]},
+                {"error": "hubspot token exchange failed"},
                 status_code=502,
             )
 
@@ -85,6 +85,6 @@ def create_callback_router(
             "Callback success: issuing proxy code for client_id=%s, redirecting to %s",
             auth_state["client_id"], auth_state["redirect_uri"],
         )
-        return RedirectResponse(url=redirect_url, status_code=307)
+        return RedirectResponse(url=redirect_url, status_code=302)
 
     return router
