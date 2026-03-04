@@ -218,6 +218,73 @@ class TestToken:
         assert resp.status_code == 200
         assert resp.json()["access_token"] == "legacy-access"
 
+    def test_token_rejects_missing_client_id(self, client):
+        """Missing client_id returns 401."""
+        resp = client.post(
+            "/token",
+            data={
+                "grant_type": "authorization_code",
+                "code": "some-code",
+                "client_secret": "some-secret",
+            },
+        )
+        assert resp.status_code == 401
+        assert resp.json()["error"] == "invalid_client"
+
+    def test_token_rejects_missing_client_secret(self, client):
+        """Missing client_secret returns 401."""
+        resp = client.post(
+            "/token",
+            data={
+                "grant_type": "authorization_code",
+                "code": "some-code",
+                "client_id": "some-id",
+            },
+        )
+        assert resp.status_code == 401
+        assert resp.json()["error"] == "invalid_client"
+
+    def test_token_rejects_unknown_client(self, client):
+        """Nonexistent client_id returns 401."""
+        resp = client.post(
+            "/token",
+            data={
+                "grant_type": "authorization_code",
+                "code": "some-code",
+                "client_id": "nonexistent-id",
+                "client_secret": "some-secret",
+            },
+        )
+        assert resp.status_code == 401
+
+    def test_auth_code_grant_missing_code(self, client, setup_client_and_code):
+        """authorization_code grant without code returns 400."""
+        info = setup_client_and_code
+        resp = client.post(
+            "/token",
+            data={
+                "grant_type": "authorization_code",
+                "client_id": info["client_id"],
+                "client_secret": info["client_secret"],
+            },
+        )
+        assert resp.status_code == 400
+        assert resp.json()["error"] == "invalid_request"
+
+    def test_refresh_grant_missing_refresh_token(self, client, setup_client_and_code):
+        """refresh_token grant without refresh_token returns 400."""
+        info = setup_client_and_code
+        resp = client.post(
+            "/token",
+            data={
+                "grant_type": "refresh_token",
+                "client_id": info["client_id"],
+                "client_secret": info["client_secret"],
+            },
+        )
+        assert resp.status_code == 400
+        assert resp.json()["error"] == "invalid_request"
+
     def test_token_response_cache_control(self, client, setup_client_and_code):
         """Token responses must include Cache-Control: no-store (RFC 6749)."""
         info = setup_client_and_code

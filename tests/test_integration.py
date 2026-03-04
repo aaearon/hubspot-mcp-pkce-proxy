@@ -132,3 +132,39 @@ class TestIntegration:
             mcp_request = respx.calls.last.request
             expected = f"Bearer {tokens['access_token']}"
             assert mcp_request.headers["authorization"] == expected
+
+    def test_register_rejects_without_auth(self, client):
+        """Integration: /register without Bearer token returns 401."""
+        resp = client.post(
+            "/register",
+            json={"redirect_uris": ["https://example.com/cb"]},
+        )
+        assert resp.status_code == 401
+
+    def test_mcp_rejects_without_auth(self, client):
+        """Integration: /mcp without Authorization header returns 401."""
+        resp = client.post(
+            "/mcp",
+            json={"jsonrpc": "2.0", "id": 1, "method": "initialize"},
+        )
+        assert resp.status_code == 401
+
+    def test_authorize_rejects_implicit_grant(self, client, settings):
+        """Integration: response_type=token is rejected at /authorize."""
+        # First register a client
+        reg = client.post(
+            "/register",
+            json={"redirect_uris": ["https://example.com/cb"]},
+            headers={"Authorization": "Bearer test-reg-token"},
+        ).json()
+        resp = client.get(
+            "/authorize",
+            params={
+                "client_id": reg["client_id"],
+                "redirect_uri": "https://example.com/cb",
+                "response_type": "token",
+                "state": "test-state",
+            },
+        )
+        assert resp.status_code == 400
+        assert resp.json()["error"] == "unsupported_response_type"
