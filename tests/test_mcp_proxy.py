@@ -93,3 +93,12 @@ class TestMcpProxy:
             headers={"Authorization": "Bearer bad-token"},
         )
         assert resp.status_code == 401
+
+    def test_proxy_rejects_no_auth_header(self, client):
+        """POST without Authorization header returns 401."""
+        resp = client.post(
+            "/mcp",
+            json={"jsonrpc": "2.0", "id": 1, "method": "initialize"},
+        )
+        assert resp.status_code == 401
+        assert resp.json()["error"] == "missing authorization header"

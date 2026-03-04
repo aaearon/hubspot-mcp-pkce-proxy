@@ -10,16 +10,17 @@ import respx
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from hubspot_mcp_proxy.crypto import hash_client_secret
 from hubspot_mcp_proxy.routes.token import create_token_router
 
 
 class TestToken:
     @pytest.fixture
-    async def setup_client_and_code(self, db):
-        """Register a client and store a proxy auth code."""
+    async def setup_client_and_code(self, db, encryptor):
+        """Register a client and store a proxy auth code with encrypted tokens."""
         client_id = "test-client-id"
         client_secret = "test-client-secret"
-        secret_hash = hashlib.sha256(client_secret.encode()).hexdigest()
+        secret_hash = hash_client_secret(client_secret)
 
         await db.insert_client(
             client_id=client_id,
@@ -30,8 +31,8 @@ class TestToken:
         expires = (datetime.now(timezone.utc) + timedelta(seconds=300)).isoformat()
         await db.insert_auth_code(
             code="proxy-code-123",
-            access_token="hs-access-token",
-            refresh_token="hs-refresh-token",
+            access_token=encryptor.encrypt("hs-access-token"),
+            refresh_token=encryptor.encrypt("hs-refresh-token"),
             token_type="bearer",
             expires_in=3600,
             client_id=client_id,
@@ -44,9 +45,9 @@ class TestToken:
         }
 
     @pytest.fixture
-    def client(self, settings, db, hub_client):
+    def client(self, settings, db, hub_client, encryptor):
         app = FastAPI()
-        app.include_router(create_token_router(settings, db, hub_client))
+        app.include_router(create_token_router(settings, db, hub_client, encryptor))
         return TestClient(app)
 
     def test_authorization_code_grant(self, client, setup_client_and_code):
@@ -163,7 +164,7 @@ class TestToken:
         info = setup_client_and_code
         # Register a second client
         other_secret = "other-client-secret"
-        other_hash = hashlib.sha256(other_secret.encode()).hexdigest()
+        other_hash = hash_client_secret(other_secret)
         await db.insert_client(
             client_id="other-client-id",
             client_secret_hash=other_hash,
@@ -182,6 +183,40 @@ class TestToken:
         )
         assert resp.status_code == 400
         assert resp.json()["error"] == "invalid_grant"
+
+    async def test_token_works_with_legacy_sha256_hash(
+        self, client, db, encryptor
+    ):
+        """Clients with legacy SHA-256 hashes should still authenticate."""
+        client_secret = "legacy-secret"
+        legacy_hash = hashlib.sha256(client_secret.encode()).hexdigest()
+        await db.insert_client(
+            client_id="legacy-client",
+            client_secret_hash=legacy_hash,
+            redirect_uris=json.dumps(["https://example.com/callback"]),
+        )
+        expires = (datetime.now(timezone.utc) + timedelta(seconds=300)).isoformat()
+        await db.insert_auth_code(
+            code="legacy-code",
+            access_token=encryptor.encrypt("legacy-access"),
+            refresh_token=encryptor.encrypt("legacy-refresh"),
+            token_type="bearer",
+            expires_in=3600,
+            client_id="legacy-client",
+            expires_at=expires,
+        )
+        resp = client.post(
+            "/token",
+            data={
+                "grant_type": "authorization_code",
+                "code": "legacy-code",
+                "client_id": "legacy-client",
+                "client_secret": client_secret,
+                "redirect_uri": "https://example.com/callback",
+            },
+        )
+        assert resp.status_code == 200
+        assert resp.json()["access_token"] == "legacy-access"
 
     def test_token_response_cache_control(self, client, setup_client_and_code):
         """Token responses must include Cache-Control: no-store (RFC 6749)."""

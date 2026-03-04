@@ -137,6 +137,15 @@ class Database:
         )
         await self._db.commit()
 
+    async def get_auth_code(self, code: str) -> dict | None:
+        now = datetime.now(timezone.utc).isoformat()
+        cursor = await self._db.execute(
+            "SELECT * FROM auth_codes WHERE code = ? AND expires_at > ?",
+            (code, now),
+        )
+        row = await cursor.fetchone()
+        return dict(row) if row else None
+
     async def get_and_delete_auth_code(self, code: str) -> dict | None:
         now = datetime.now(timezone.utc).isoformat()
         cursor = await self._db.execute(

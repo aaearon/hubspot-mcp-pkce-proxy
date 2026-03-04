@@ -3,7 +3,7 @@
 import logging
 
 from fastapi import APIRouter, Request
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 
 from hubspot_mcp_proxy.hub_client import HubSpotClient
 
@@ -19,13 +19,18 @@ def create_mcp_router(hub_client: HubSpotClient) -> APIRouter:
         body = await request.body()
         headers = {k: v for k, v in request.headers.items()}
 
+        # Reject requests without Authorization header
+        if "authorization" not in headers:
+            logger.warning("MCP proxy rejected: missing authorization header")
+            return JSONResponse(
+                {"error": "missing authorization header"}, status_code=401
+            )
+
         session_id = headers.get("mcp-session-id", "none")
-        has_auth = "authorization" in headers
         logger.info(
-            "MCP proxy request: session=%s auth=%s len=%d",
-            session_id, has_auth, len(body),
+            "MCP proxy request: session=%s len=%d",
+            session_id, len(body),
         )
-        logger.debug("MCP request body: %s", body[:500])
 
         upstream = await hub_client.proxy_mcp(body, headers)
 

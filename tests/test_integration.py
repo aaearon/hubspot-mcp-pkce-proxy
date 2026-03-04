@@ -18,6 +18,11 @@ class TestIntegration:
         monkeypatch.setenv("HUBSPOT_CLIENT_SECRET", "hs-client-secret")
         monkeypatch.setenv("PROXY_BASE_URL", "https://proxy.example.com")
         monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "integration.db"))
+        monkeypatch.setenv("REGISTRATION_TOKEN", "test-reg-token")
+        monkeypatch.setenv(
+            "TOKEN_ENCRYPTION_KEY",
+            "imk_7pWm4NQntQwKYk93wRJh362s6Fsmtph6u_JcTeU=",
+        )
         return Settings()
 
     @pytest.fixture
@@ -46,6 +51,7 @@ class TestIntegration:
                 "redirect_uris": ["https://copilot.example.com/callback"],
                 "client_name": "Integration Test",
             },
+            headers={"Authorization": "Bearer test-reg-token"},
         ).json()
         dcr_client_id = reg["client_id"]
         dcr_client_secret = reg["client_secret"]

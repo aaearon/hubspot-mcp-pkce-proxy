@@ -1,13 +1,12 @@
 """Token endpoint - authorization_code and refresh_token grants."""
 
-import hashlib
-import hmac
 import logging
 
 from fastapi import APIRouter, Form
 from fastapi.responses import JSONResponse
 
 from hubspot_mcp_proxy.config import Settings
+from hubspot_mcp_proxy.crypto import TokenEncryptor, verify_client_secret
 from hubspot_mcp_proxy.db import Database
 from hubspot_mcp_proxy.hub_client import HubSpotClient
 
@@ -15,7 +14,10 @@ logger = logging.getLogger(__name__)
 
 
 def create_token_router(
-    settings: Settings, db: Database, hub_client: HubSpotClient
+    settings: Settings,
+    db: Database,
+    hub_client: HubSpotClient,
+    encryptor: TokenEncryptor,
 ) -> APIRouter:
     router = APIRouter()
 
@@ -24,8 +26,7 @@ def create_token_router(
         client = await db.get_client(client_id)
         if client is None:
             return None
-        expected = hashlib.sha256(client_secret.encode()).hexdigest()
-        if not hmac.compare_digest(client["client_secret_hash"], expected):
+        if not verify_client_secret(client_secret, client["client_secret_hash"]):
             return None
         return client
 
@@ -83,12 +84,15 @@ def create_token_router(
                 "Token issued via auth_code for client_id=%s",
                 client_id,
             )
+            raw_refresh = auth_code["refresh_token"]
             return JSONResponse(
                 {
-                    "access_token": auth_code["access_token"],
+                    "access_token": encryptor.decrypt(auth_code["access_token"]),
                     "token_type": auth_code["token_type"],
                     "expires_in": auth_code["expires_in"],
-                    "refresh_token": auth_code["refresh_token"],
+                    "refresh_token": (
+                        encryptor.decrypt(raw_refresh) if raw_refresh else None
+                    ),
                 },
                 headers={"Cache-Control": "no-store"},
             )
