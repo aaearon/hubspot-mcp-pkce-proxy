@@ -1,0 +1,16 @@
+# Terraform state (local PoC)
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+
+# Crash logs
+crash.log
+crash.*.log
+
+# Variable overrides
+*.tfvars
+!example.tfvars
+
+# Plan files
+*.tfplan

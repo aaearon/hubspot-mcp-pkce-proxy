@@ -23,10 +23,10 @@ class TestMetadata:
         assert data["token_endpoint"] == f"{settings.proxy_base_url}/token"
         assert data["registration_endpoint"] == f"{settings.proxy_base_url}/register"
 
-    def test_metadata_does_not_advertise_pkce(self, client):
+    def test_metadata_advertises_pkce(self, client):
         resp = client.get("/.well-known/oauth-authorization-server")
         data = resp.json()
-        assert "code_challenge_methods_supported" not in data
+        assert data["code_challenge_methods_supported"] == ["S256"]
 
     def test_metadata_supported_values(self, client):
         resp = client.get("/.well-known/oauth-authorization-server")
@@ -43,3 +43,25 @@ class TestMetadata:
         data = resp.json()
         assert data["issuer"] == settings.proxy_base_url
         assert data["authorization_endpoint"] == f"{settings.proxy_base_url}/authorize"
+
+
+class TestProtectedResourceMetadata:
+    """Tests for RFC 9728 Protected Resource Metadata."""
+
+    @pytest.fixture
+    def client(self, settings):
+        app = FastAPI()
+        app.include_router(create_metadata_router(settings))
+        return TestClient(app)
+
+    def test_prm_returns_valid_json(self, client, settings):
+        resp = client.get("/.well-known/oauth-protected-resource")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["resource"] == settings.proxy_base_url
+        assert data["authorization_servers"] == [settings.proxy_base_url]
+        assert data["bearer_methods_supported"] == ["header"]
+
+    def test_prm_content_type(self, client):
+        resp = client.get("/.well-known/oauth-protected-resource")
+        assert "application/json" in resp.headers["content-type"]
