@@ -40,3 +40,4 @@ class OAuthMetadata(BaseModel):
     response_types_supported: list[str]
     grant_types_supported: list[str]
     token_endpoint_auth_methods_supported: list[str]
+    code_challenge_methods_supported: list[str] | None = None

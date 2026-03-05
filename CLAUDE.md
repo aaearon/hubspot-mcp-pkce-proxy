@@ -13,7 +13,7 @@ Copilot Studio (no PKCE support). Python + FastAPI.
 - `src/hubspot_mcp_proxy/pkce.py` - PKCE code verifier/challenge generation
 - `src/hubspot_mcp_proxy/models.py` - Pydantic request/response models
 - `src/hubspot_mcp_proxy/routes/` - FastAPI route modules
-- `tests/` - pytest test suite (95 tests)
+- `tests/` - pytest test suite (94 tests)
 - `scripts/test_discovery.sh` - End-to-end OAuth discovery flow verification
 - `infra/` - Terraform IaC for Azure Container Apps
 
@@ -69,7 +69,7 @@ docker compose up -d
 | GET | `/callback` | HubSpot callback (exchanges code, handles errors) |
 | POST | `/token` | Token exchange / refresh |
 | POST | `/mcp` | MCP HTTP reverse proxy (requires Authorization) |
-| GET | `/mcp` | MCP SSE stream proxy (requires Authorization) |
+| GET | `/mcp` | OAuth discovery trigger (returns 401) |
 | GET | `/health` | Health check |
 
 ## Infrastructure
