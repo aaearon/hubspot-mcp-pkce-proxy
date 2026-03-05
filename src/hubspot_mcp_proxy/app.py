@@ -72,7 +72,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(create_authorize_router(settings, db, encryptor))
     app.include_router(create_callback_router(settings, db, hub_client, encryptor))
     app.include_router(create_token_router(settings, db, hub_client, encryptor))
-    app.include_router(create_mcp_router(hub_client))
+    app.include_router(create_mcp_router(hub_client, settings))
 
     @app.get("/health")
     async def health():

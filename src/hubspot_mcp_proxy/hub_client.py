@@ -70,5 +70,21 @@ class HubSpotClient:
             timeout=120.0,
         )
 
+    async def stream_mcp_sse(
+        self, headers: dict[str, str]
+    ) -> httpx.Response:
+        """Open GET to HubSpot MCP endpoint for SSE stream."""
+        forward_headers: dict[str, str] = {"accept": "text/event-stream"}
+        for key in ("authorization", "mcp-session-id"):
+            if key in headers:
+                forward_headers[key] = headers[key]
+
+        logger.debug("HubSpot MCP SSE GET: url=%s", self._settings.hubspot_mcp_url)
+        return await self._http.get(
+            self._settings.hubspot_mcp_url,
+            headers=forward_headers,
+            timeout=120.0,
+        )
+
     async def close(self) -> None:
         await self._http.aclose()
