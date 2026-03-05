@@ -35,3 +35,11 @@ class TestMetadata:
         assert "authorization_code" in data["grant_types_supported"]
         assert "refresh_token" in data["grant_types_supported"]
         assert data["token_endpoint_auth_methods_supported"] == ["client_secret_post"]
+
+    def test_openid_configuration_alias(self, client, settings):
+        """/.well-known/openid-configuration returns same metadata."""
+        resp = client.get("/.well-known/openid-configuration")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["issuer"] == settings.proxy_base_url
+        assert data["authorization_endpoint"] == f"{settings.proxy_base_url}/authorize"
