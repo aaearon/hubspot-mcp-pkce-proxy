@@ -48,7 +48,8 @@ docker compose up -d
 - Structured logging: INFO for flow events, WARNING for auth failures, ERROR for upstream errors, DEBUG for sensitive details
 - Fernet (AES-128-CBC + HMAC-SHA256) for encrypting tokens at rest in SQLite
 - scrypt (n=16384, r=8, p=1) for hashing client secrets, with SHA-256 legacy fallback
-- Open DCR `/register` endpoint (IP-restricted at infra level)
+- Open DCR `/register` endpoint (IP-restricted at infra level, redirect URI domain allowlist)
+- `ALLOWED_REDIRECT_DOMAINS` restricts DCR redirect URIs to approved domains (default: `["api.powerva.microsoft.com"]`); supports subdomains, requires `https`
 - Authorization header required for MCP proxy endpoints
 - State parameter validated against `[A-Za-z0-9_\-\.~]{1,512}` pattern
 - Only `response_type=code` accepted (implicit grant rejected)
@@ -105,9 +106,20 @@ curl -s https://<your-domain>/health
 |----------|---------|---------------|
 | `TOKEN_ENCRYPTION_KEY` | Fernet key for encrypting tokens at rest | `python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` |
 
+**New optional environment variable:**
+
+| Variable | Purpose | Default |
+|----------|---------|---------|
+| `ALLOWED_REDIRECT_DOMAINS` | JSON list of allowed redirect URI domains for DCR | `["api.powerva.microsoft.com"]` |
+
 **Endpoint authentication changes:**
-- `POST /register` is open (no auth required) — relies on IP restrictions at infra level for access control.
+- `POST /register` is open (no auth required) — relies on IP restrictions at infra level and redirect URI domain allowlist for access control.
 - `POST /mcp` and `POST /` now require an `Authorization` header. Requests without one return 401. Copilot Studio already sends this, so no client changes needed.
+
+**Input validation on `/register`:**
+- `redirect_uris` must all use `https` scheme
+- Each URI's hostname must match or be a subdomain of an `ALLOWED_REDIRECT_DOMAINS` entry
+- Rejected URIs return 400 with `{"error": "invalid_redirect_uri"}`
 
 **Input validation on `/authorize`:**
 - `response_type` must be `code` (implicit grant `token` is rejected with 400)

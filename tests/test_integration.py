@@ -47,7 +47,7 @@ class TestIntegration:
         reg = client.post(
             "/register",
             json={
-                "redirect_uris": ["https://copilot.example.com/callback"],
+                "redirect_uris": ["https://api.powerva.microsoft.com/callback"],
                 "client_name": "Integration Test",
             },
             headers={"Authorization": "Bearer test-reg-token"},
@@ -60,7 +60,7 @@ class TestIntegration:
             "/authorize",
             params={
                 "client_id": dcr_client_id,
-                "redirect_uri": "https://copilot.example.com/callback",
+                "redirect_uri": "https://api.powerva.microsoft.com/callback",
                 "response_type": "code",
                 "state": "copilot-state-abc",
                 "scope": "crm.objects.contacts.read",
@@ -104,7 +104,7 @@ class TestIntegration:
                 "code": proxy_code,
                 "client_id": dcr_client_id,
                 "client_secret": dcr_client_secret,
-                "redirect_uri": "https://copilot.example.com/callback",
+                "redirect_uri": "https://api.powerva.microsoft.com/callback",
             },
         )
         assert token_resp.status_code == 200
@@ -136,7 +136,7 @@ class TestIntegration:
         """Integration: /register works without auth (open DCR)."""
         resp = client.post(
             "/register",
-            json={"redirect_uris": ["https://example.com/cb"]},
+            json={"redirect_uris": ["https://api.powerva.microsoft.com/cb"]},
         )
         assert resp.status_code == 201
 
@@ -153,14 +153,14 @@ class TestIntegration:
         # First register a client
         reg = client.post(
             "/register",
-            json={"redirect_uris": ["https://example.com/cb"]},
+            json={"redirect_uris": ["https://api.powerva.microsoft.com/cb"]},
             headers={"Authorization": "Bearer test-reg-token"},
         ).json()
         resp = client.get(
             "/authorize",
             params={
                 "client_id": reg["client_id"],
-                "redirect_uri": "https://example.com/cb",
+                "redirect_uri": "https://api.powerva.microsoft.com/cb",
                 "response_type": "token",
                 "state": "test-state",
             },

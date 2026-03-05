@@ -4,10 +4,12 @@ import json
 import logging
 import secrets
 import uuid
+from urllib.parse import urlparse
 
 from fastapi import APIRouter
 from starlette.responses import JSONResponse
 
+from hubspot_mcp_proxy.config import Settings
 from hubspot_mcp_proxy.crypto import hash_client_secret
 from hubspot_mcp_proxy.db import Database
 from hubspot_mcp_proxy.models import DCRRequest, DCRResponse
@@ -15,7 +17,26 @@ from hubspot_mcp_proxy.models import DCRRequest, DCRResponse
 logger = logging.getLogger(__name__)
 
 
-def create_register_router(db: Database) -> APIRouter:
+def _validate_redirect_uris(
+    uris: list[str], allowed_domains: list[str],
+) -> str | None:
+    """Return an error message if any URI is invalid, else None."""
+    for uri in uris:
+        parsed = urlparse(uri)
+        if parsed.scheme != "https":
+            return f"redirect_uri must use https scheme: {uri}"
+        hostname = parsed.hostname
+        if not hostname:
+            return f"redirect_uri has no hostname: {uri}"
+        if not any(
+            hostname == domain or hostname.endswith("." + domain)
+            for domain in allowed_domains
+        ):
+            return f"redirect_uri domain not in allowlist: {hostname}"
+    return None
+
+
+def create_register_router(db: Database, settings: Settings) -> APIRouter:
     router = APIRouter()
 
     @router.post("/register", status_code=201)
@@ -24,6 +45,17 @@ def create_register_router(db: Database) -> APIRouter:
             "DCR request: client_name=%s uris=%s",
             request.client_name, request.redirect_uris,
         )
+
+        error = _validate_redirect_uris(
+            request.redirect_uris, settings.allowed_redirect_domains,
+        )
+        if error:
+            logger.warning("DCR rejected: %s", error)
+            return JSONResponse(
+                content={"error": "invalid_redirect_uri", "error_description": error},
+                status_code=400,
+            )
+
         client_id = str(uuid.uuid4())
         client_secret = secrets.token_urlsafe(32)
         secret_hash = hash_client_secret(client_secret)
