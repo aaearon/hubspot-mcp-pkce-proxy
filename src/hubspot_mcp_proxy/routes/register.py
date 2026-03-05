@@ -25,6 +25,8 @@ def _validate_redirect_uris(
         parsed = urlparse(uri)
         if parsed.scheme != "https":
             return f"redirect_uri must use https scheme: {uri}"
+        if parsed.username is not None or parsed.password is not None:
+            return f"redirect_uri must not contain userinfo: {uri}"
         hostname = parsed.hostname
         if not hostname:
             return f"redirect_uri has no hostname: {uri}"

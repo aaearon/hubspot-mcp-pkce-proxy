@@ -175,3 +175,29 @@ class TestRedirectUriValidation:
             },
         )
         assert resp.status_code == 400
+
+    def test_userinfo_in_uri_rejected(self, client):
+        """URI with userinfo (user@host) is rejected to prevent open redirect."""
+        resp = client.post(
+            "/register",
+            json={
+                "redirect_uris": [
+                    "https://evil.com@api.powerva.microsoft.com/callback"
+                ]
+            },
+        )
+        assert resp.status_code == 400
+        assert resp.json()["error"] == "invalid_redirect_uri"
+
+    def test_password_userinfo_in_uri_rejected(self, client):
+        """URI with user:password@host userinfo is rejected."""
+        resp = client.post(
+            "/register",
+            json={
+                "redirect_uris": [
+                    "https://user:pass@api.powerva.microsoft.com/callback"
+                ]
+            },
+        )
+        assert resp.status_code == 400
+        assert resp.json()["error"] == "invalid_redirect_uri"
