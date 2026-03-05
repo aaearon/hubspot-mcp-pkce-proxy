@@ -20,6 +20,7 @@ def create_metadata_router(settings: Settings) -> APIRouter:
     )
 
     @router.get("/.well-known/oauth-authorization-server")
+    @router.get("/.well-known/openid-configuration")
     async def metadata() -> OAuthMetadata:
         return _cached
 
