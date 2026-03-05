@@ -35,7 +35,8 @@ docker compose up -d
 ```
 
 ## Key Decisions
-- async SQLite via aiosqlite (single-file DB, no external deps)
+- In-memory SQLite by default (`:memory:`) — all stored data is transient and auto-recoverable; set `DATABASE_PATH` env var for file-based persistence
+- async SQLite via aiosqlite (no external deps)
 - httpx for async HTTP client (HubSpot API calls)
 - pydantic-settings for configuration
 - respx for mocking httpx in tests
@@ -70,7 +71,6 @@ docker compose up -d
 - **Host**: `optiplex:/home/tim/hubspot-mcp-pkce-proxy`
 - **Port**: 8100 (host) -> 8000 (container)
 - **Network**: `media_default` (external, shared with Traefik)
-- **Volume**: `proxy-data` -> `/data` (SQLite persistence)
 - **Traefik config**: `optiplex:/home/tim/media/appdata/traefik/dynamic/hubspot-mcp.yml`
 - Includes `strip-trailing-slash` middleware for `/mcp/` -> `/mcp` redirect
 

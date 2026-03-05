@@ -1,8 +1,11 @@
 """Async SQLite database layer."""
 
+import logging
 from datetime import datetime, timezone
 
 import aiosqlite
+
+logger = logging.getLogger(__name__)
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS clients (
@@ -45,6 +48,7 @@ class Database:
     async def init(self) -> None:
         self._db = await aiosqlite.connect(self._path)
         self._db.row_factory = aiosqlite.Row
+        await self._db.execute("PRAGMA busy_timeout = 5000")
         await self._db.execute("PRAGMA journal_mode=WAL")
         await self._db.executescript(_SCHEMA)
 
