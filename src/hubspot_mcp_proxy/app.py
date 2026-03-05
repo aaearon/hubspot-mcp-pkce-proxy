@@ -2,10 +2,11 @@
 
 import asyncio
 import logging
+import time
 from contextlib import asynccontextmanager
 
 import httpx
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 
 from hubspot_mcp_proxy.config import Settings
 from hubspot_mcp_proxy.crypto import TokenEncryptor
@@ -66,6 +67,25 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         logger.info("Shutdown complete")
 
     app = FastAPI(title="HubSpot MCP PKCE Proxy", lifespan=lifespan)
+
+    @app.middleware("http")
+    async def log_requests(request: Request, call_next):
+        """Log every incoming request for diagnostics."""
+        ua = request.headers.get("user-agent", "-")
+        has_auth = "yes" if request.headers.get("authorization") else "no"
+        start = time.monotonic()
+        response = await call_next(request)
+        elapsed_ms = (time.monotonic() - start) * 1000
+        logger.info(
+            "%s %s → %d (%.0fms) ua=%s auth=%s",
+            request.method,
+            request.url.path,
+            response.status_code,
+            elapsed_ms,
+            ua,
+            has_auth,
+        )
+        return response
 
     app.include_router(create_metadata_router(settings))
     app.include_router(create_register_router(db))

@@ -13,7 +13,9 @@ Copilot Studio (no PKCE support). Python + FastAPI.
 - `src/hubspot_mcp_proxy/pkce.py` - PKCE code verifier/challenge generation
 - `src/hubspot_mcp_proxy/models.py` - Pydantic request/response models
 - `src/hubspot_mcp_proxy/routes/` - FastAPI route modules
-- `tests/` - pytest test suite (90 tests)
+- `tests/` - pytest test suite (95 tests)
+- `scripts/test_discovery.sh` - End-to-end OAuth discovery flow verification
+- `infra/` - Terraform IaC for Azure Container Apps
 
 ## Development
 
@@ -40,7 +42,9 @@ docker compose up -d
 - httpx for async HTTP client (HubSpot API calls)
 - pydantic-settings for configuration
 - respx for mocking httpx in tests
-- No PKCE advertised in OAuth metadata (Copilot Studio must not see it)
+- PKCE (`code_challenge_methods_supported: ["S256"]`) advertised in AS metadata — required for Copilot Studio to proceed past discovery. CS doesn't actually send PKCE; our proxy generates its own for HubSpot
+- RFC 9728 Protected Resource Metadata at `/.well-known/oauth-protected-resource`
+- 401 responses include `WWW-Authenticate` header with `resource_metadata` URL per RFC 9728
 - Structured logging: INFO for flow events, WARNING for auth failures, ERROR for upstream errors, DEBUG for sensitive details
 - Fernet (AES-128-CBC + HMAC-SHA256) for encrypting tokens at rest in SQLite
 - scrypt (n=16384, r=8, p=1) for hashing client secrets, with SHA-256 legacy fallback
@@ -58,7 +62,8 @@ docker compose up -d
 ## Endpoints
 | Method | Path | Purpose |
 |--------|------|---------|
-| GET | `/.well-known/oauth-authorization-server` | RFC 8414 metadata |
+| GET | `/.well-known/oauth-authorization-server` | RFC 8414 AS metadata |
+| GET | `/.well-known/oauth-protected-resource` | RFC 9728 PRM |
 | POST | `/register` | RFC 7591 DCR (requires Bearer token) |
 | GET | `/authorize` | OAuth authorize (injects PKCE) |
 | GET | `/callback` | HubSpot callback (exchanges code, handles errors) |
@@ -68,26 +73,26 @@ docker compose up -d
 | GET | `/health` | Health check |
 
 ## Infrastructure
-- **Domain**: `hmcp.ams.iosharp.com` (via Traefik TLS with Let's Encrypt)
-- **Host**: `optiplex:/home/tim/hubspot-mcp-pkce-proxy`
-- **Port**: 8100 (host) -> 8000 (container)
-- **Network**: `media_default` (external, shared with Traefik)
-- **Traefik config**: `optiplex:/home/tim/media/appdata/traefik/dynamic/hubspot-mcp.yml`
-- Includes `strip-trailing-slash` middleware for `/mcp/` -> `/mcp` redirect
+- **Hosting**: Azure Container Apps
+- **TLS**: Let's Encrypt (managed via Terraform ACME provider)
+- **IaC**: Terraform in `infra/` (local state, not committed)
+- **IP restrictions**: PowerPlatformPlex + AzureConnectors service tags (toggleable via `enable_ip_restrictions` variable)
+- **Diagnostic logging**: Request middleware logs method, path, user-agent, auth presence, status code for every request
+- See `infra/` for resource names, ACR, DNS, and deployment details
 
 ### Deployment
 ```bash
-# Sync code to optiplex (from WSL2)
-rsync -avz --exclude='.venv' --exclude='__pycache__' --exclude='.pytest_cache' \
-  --exclude='*.egg-info' --exclude='.env' --exclude='.ruff_cache' --exclude='.git' \
-  -e ssh.exe . optiplex:/home/tim/hubspot-mcp-pkce-proxy/
+# Build and push container image
+./infra/deploy.sh
 
-# Build and start
-ssh.exe optiplex "sudo docker compose -f /home/tim/hubspot-mcp-pkce-proxy/docker-compose.yml up -d --build"
+# Infrastructure-only change (no container rebuild)
+./infra/deploy.sh --skip-build
 
-# Check status
-ssh.exe optiplex "sudo docker ps --filter name=hubspot-mcp-proxy"
-ssh.exe optiplex "curl -s http://localhost:8100/health"
+# Code-only change (no Terraform)
+./infra/deploy.sh --skip-infra
+
+# Check health
+curl -s https://<your-domain>/health
 ```
 
 ## Migration Guide (for LLMs and operators deploying updates)
