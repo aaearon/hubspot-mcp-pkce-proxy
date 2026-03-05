@@ -18,7 +18,6 @@ class TestIntegration:
         monkeypatch.setenv("HUBSPOT_CLIENT_SECRET", "hs-client-secret")
         monkeypatch.setenv("PROXY_BASE_URL", "https://proxy.example.com")
         monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "integration.db"))
-        monkeypatch.setenv("REGISTRATION_TOKEN", "test-reg-token")
         monkeypatch.setenv(
             "TOKEN_ENCRYPTION_KEY",
             "imk_7pWm4NQntQwKYk93wRJh362s6Fsmtph6u_JcTeU=",
@@ -133,13 +132,13 @@ class TestIntegration:
             expected = f"Bearer {tokens['access_token']}"
             assert mcp_request.headers["authorization"] == expected
 
-    def test_register_rejects_without_auth(self, client):
-        """Integration: /register without Bearer token returns 401."""
+    def test_register_open_without_auth(self, client):
+        """Integration: /register works without auth (open DCR)."""
         resp = client.post(
             "/register",
             json={"redirect_uris": ["https://example.com/cb"]},
         )
-        assert resp.status_code == 401
+        assert resp.status_code == 201
 
     def test_mcp_rejects_without_auth(self, client):
         """Integration: /mcp without Authorization header returns 401."""

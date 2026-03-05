@@ -13,7 +13,7 @@ Copilot Studio (no PKCE support). Python + FastAPI.
 - `src/hubspot_mcp_proxy/pkce.py` - PKCE code verifier/challenge generation
 - `src/hubspot_mcp_proxy/models.py` - Pydantic request/response models
 - `src/hubspot_mcp_proxy/routes/` - FastAPI route modules
-- `tests/` - pytest test suite (91 tests)
+- `tests/` - pytest test suite (89 tests)
 
 ## Development
 
@@ -44,7 +44,7 @@ docker compose up -d
 - Structured logging: INFO for flow events, WARNING for auth failures, ERROR for upstream errors, DEBUG for sensitive details
 - Fernet (AES-128-CBC + HMAC-SHA256) for encrypting tokens at rest in SQLite
 - scrypt (n=16384, r=8, p=1) for hashing client secrets, with SHA-256 legacy fallback
-- Bearer token required for DCR `/register` endpoint
+- Open DCR `/register` endpoint (IP-restricted at infra level)
 - Authorization header required for MCP proxy endpoints
 - State parameter validated against `[A-Za-z0-9_\-\.~]{1,512}` pattern
 - Only `response_type=code` accepted (implicit grant rejected)
@@ -94,15 +94,14 @@ ssh.exe optiplex "curl -s http://localhost:8100/health"
 
 ### Breaking Changes (Security Hardening Release)
 
-**Two new required environment variables** - the service will NOT start without them:
+**One new required environment variable** - the service will NOT start without it:
 
 | Variable | Purpose | Generate with |
 |----------|---------|---------------|
-| `REGISTRATION_TOKEN` | Bearer token for `POST /register` | `python3 -c "import secrets; print(secrets.token_urlsafe(32))"` |
 | `TOKEN_ENCRYPTION_KEY` | Fernet key for encrypting tokens at rest | `python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` |
 
 **Endpoint authentication changes:**
-- `POST /register` now requires `Authorization: Bearer <REGISTRATION_TOKEN>` header. Requests without it return 401.
+- `POST /register` is open (no auth required) — relies on IP restrictions at infra level for access control.
 - `POST /mcp` and `POST /` now require an `Authorization` header. Requests without one return 401. Copilot Studio already sends this, so no client changes needed.
 
 **Input validation on `/authorize`:**
@@ -116,7 +115,7 @@ ssh.exe optiplex "curl -s http://localhost:8100/health"
 3. Wait 10 minutes (allows in-flight auth_states/auth_codes to expire - they cannot be decrypted by the new instance since they were stored unencrypted)
 4. Rebuild and start: `docker compose up -d --build`
 5. Verify health: `curl http://localhost:8100/health`
-6. If Copilot Studio needs to re-register: `curl -X POST https://<domain>/register -H "Authorization: Bearer <REGISTRATION_TOKEN>" -H "Content-Type: application/json" -d '{"redirect_uris": ["..."], "client_name": "..."}'`
+6. If Copilot Studio needs to re-register: `curl -X POST https://<domain>/register -H "Content-Type: application/json" -d '{"redirect_uris": ["..."], "client_name": "..."}'`
 
 ### Backward Compatibility
 - **Client secret hashing**: Existing clients with SHA-256 hashes continue to work (legacy fallback in `verify_client_secret`). New registrations use scrypt.

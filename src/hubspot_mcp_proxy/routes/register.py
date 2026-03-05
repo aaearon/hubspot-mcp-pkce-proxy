@@ -1,15 +1,13 @@
 """RFC 7591 Dynamic Client Registration endpoint."""
 
-import hmac
 import json
 import logging
 import secrets
 import uuid
 
-from fastapi import APIRouter, Header
+from fastapi import APIRouter
 from starlette.responses import JSONResponse
 
-from hubspot_mcp_proxy.config import Settings
 from hubspot_mcp_proxy.crypto import hash_client_secret
 from hubspot_mcp_proxy.db import Database
 from hubspot_mcp_proxy.models import DCRRequest, DCRResponse
@@ -17,24 +15,11 @@ from hubspot_mcp_proxy.models import DCRRequest, DCRResponse
 logger = logging.getLogger(__name__)
 
 
-def create_register_router(db: Database, settings: Settings) -> APIRouter:
+def create_register_router(db: Database) -> APIRouter:
     router = APIRouter()
 
     @router.post("/register", status_code=201)
-    async def register(
-        request: DCRRequest,
-        authorization: str | None = Header(default=None),
-    ) -> JSONResponse:
-        # Validate bearer token
-        if not authorization or not authorization.startswith("Bearer "):
-            logger.warning("DCR rejected: missing or invalid authorization")
-            return JSONResponse({"error": "unauthorized"}, status_code=401)
-
-        token = authorization[7:]  # strip "Bearer "
-        if not hmac.compare_digest(token, settings.registration_token):
-            logger.warning("DCR rejected: invalid registration token")
-            return JSONResponse({"error": "unauthorized"}, status_code=401)
-
+    async def register(request: DCRRequest) -> JSONResponse:
         logger.info(
             "DCR request: client_name=%s uris=%s",
             request.client_name, request.redirect_uris,
