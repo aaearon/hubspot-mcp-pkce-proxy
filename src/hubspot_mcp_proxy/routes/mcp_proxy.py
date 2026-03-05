@@ -82,6 +82,13 @@ def create_mcp_router(hub_client: HubSpotClient, settings: Settings) -> APIRoute
     async def mcp_sse_proxy(request: Request) -> Response:
         headers = {k: v for k, v in request.headers.items()}
 
+        # Return 401 to trigger OAuth discovery flow in MCP clients
+        if "authorization" not in headers:
+            logger.warning("MCP SSE proxy rejected: missing authorization header")
+            return JSONResponse(
+                {"error": "missing authorization header"}, status_code=401
+            )
+
         session_id = headers.get("mcp-session-id", "none")
         logger.info("MCP SSE proxy GET: session=%s", session_id)
 

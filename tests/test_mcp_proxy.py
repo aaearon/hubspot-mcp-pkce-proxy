@@ -183,19 +183,11 @@ class TestMcpGetSseProxy:
         # Verify returned in response
         assert resp.headers["mcp-session-id"] == "sess-456"
 
-    @respx.mock
-    def test_get_sse_no_auth_passes_through(self, client, settings):
-        """GET /mcp without Authorization still proxies (pre-OAuth SSE)."""
-        sse_body = b"event: message\ndata: {}\n\n"
-        respx.get(settings.hubspot_mcp_url).mock(
-            return_value=httpx.Response(
-                200,
-                content=sse_body,
-                headers={"content-type": "text/event-stream"},
-            )
-        )
+    def test_get_sse_rejects_no_auth(self, client):
+        """GET /mcp without Authorization returns 401 to trigger OAuth flow."""
         resp = client.get("/mcp")
-        assert resp.status_code == 200
+        assert resp.status_code == 401
+        assert resp.json()["error"] == "missing authorization header"
 
     @respx.mock
     def test_get_root_sse_stream(self, client, settings):
