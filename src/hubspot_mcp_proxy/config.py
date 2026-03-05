@@ -17,3 +17,5 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     token_encryption_key: str
+
+    allowed_redirect_domains: list[str] = ["api.powerva.microsoft.com"]

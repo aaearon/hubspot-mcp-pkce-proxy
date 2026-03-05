@@ -88,7 +88,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return response
 
     app.include_router(create_metadata_router(settings))
-    app.include_router(create_register_router(db))
+    app.include_router(create_register_router(db, settings))
     app.include_router(create_authorize_router(settings, db, encryptor))
     app.include_router(create_callback_router(settings, db, hub_client, encryptor))
     app.include_router(create_token_router(settings, db, hub_client, encryptor))
