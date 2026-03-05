@@ -2,6 +2,68 @@
 
 from datetime import datetime, timedelta, timezone
 
+from hubspot_mcp_proxy.db import Database
+
+
+class TestDatabaseInit:
+    async def test_busy_timeout_is_set(self, db):
+        """busy_timeout pragma must be set after init."""
+        cursor = await db._db.execute("PRAGMA busy_timeout")
+        row = await cursor.fetchone()
+        assert row[0] == 5000
+
+    async def test_in_memory_database(self):
+        """Database works with ':memory:' path."""
+        db = Database(":memory:")
+        await db.init()
+        await db.insert_client(
+            client_id="c1",
+            client_secret_hash="hash1",
+            redirect_uris='["https://example.com/cb"]',
+            client_name="Test App",
+        )
+        row = await db.get_client("c1")
+        assert row is not None
+        assert row["client_id"] == "c1"
+        await db.close()
+
+    async def test_journal_mode_for_in_memory(self):
+        """In-memory databases use 'memory' journal mode (WAL not applicable)."""
+        db = Database(":memory:")
+        await db.init()
+        cursor = await db._db.execute("PRAGMA journal_mode")
+        row = await cursor.fetchone()
+        assert row[0] == "memory"
+        await db.close()
+
+
+class TestSchemaInit:
+    async def test_tables_exist_after_init(self, db):
+        """Schema must create all tables during init."""
+        cursor = await db._db.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
+        )
+        tables = [row[0] for row in await cursor.fetchall()]
+        assert "auth_codes" in tables
+        assert "auth_states" in tables
+        assert "clients" in tables
+
+    async def test_init_idempotent_on_existing_db(self, tmp_path):
+        """Re-init on existing DB must not lose tables."""
+        path = str(tmp_path / "idem.db")
+        db1 = Database(path)
+        await db1.init()
+        await db1.close()
+
+        db2 = Database(path)
+        await db2.init()
+        cursor = await db2._db.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
+        )
+        tables = [row[0] for row in await cursor.fetchall()]
+        await db2.close()
+        assert "auth_states" in tables
+
 
 class TestClients:
     async def test_insert_and_get_client(self, db):

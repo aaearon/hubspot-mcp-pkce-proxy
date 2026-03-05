@@ -29,7 +29,7 @@ class TestSettings:
         assert s.hubspot_auth_url == "https://app.hubspot.com/oauth/authorize"
         assert s.hubspot_token_url == "https://api.hubapi.com/oauth/v1/token"
         assert s.hubspot_mcp_url == "https://mcp.hubspot.com"
-        assert s.database_path == "/data/proxy.db"
+        assert s.database_path == ":memory:"
         assert s.auth_state_ttl_seconds == 600
         assert s.auth_code_ttl_seconds == 300
         assert s.log_level == "INFO"
