@@ -90,7 +90,7 @@ variable "hubspot_token_url" {
 variable "hubspot_mcp_url" {
   description = "HubSpot MCP server URL"
   type        = string
-  default     = "https://app.hubspot.com/api/mcp/v0_1/sse"
+  default     = "https://mcp.hubspot.com"
 }
 
 variable "hubspot_scopes" {
