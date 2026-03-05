@@ -32,3 +32,9 @@ htmlcov/
 
 # Ruff
 .ruff_cache/
+
+# Terraform (state managed locally, not in repo)
+infra/.terraform/
+infra/*.tfstate*
+infra/*.tfvars
+infra/.terraform.lock.hcl
