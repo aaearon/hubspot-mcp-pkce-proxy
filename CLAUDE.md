@@ -13,7 +13,7 @@ Copilot Studio (no PKCE support). Python + FastAPI.
 - `src/hubspot_mcp_proxy/pkce.py` - PKCE code verifier/challenge generation
 - `src/hubspot_mcp_proxy/models.py` - Pydantic request/response models
 - `src/hubspot_mcp_proxy/routes/` - FastAPI route modules
-- `tests/` - pytest test suite (94 tests)
+- `tests/` - pytest test suite (107 tests)
 - `scripts/test_discovery.sh` - End-to-end OAuth discovery flow verification
 - `infra/` - Terraform IaC for Azure Container Apps
 
