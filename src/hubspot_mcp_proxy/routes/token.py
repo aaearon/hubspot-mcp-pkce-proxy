@@ -2,6 +2,7 @@
 
 import logging
 
+from cryptography.fernet import InvalidToken
 from fastapi import APIRouter, Form
 from fastapi.responses import JSONResponse
 
@@ -62,7 +63,8 @@ def create_token_router(
                     {"error": "invalid_request", "error_description": "code required"},
                     status_code=400,
                 )
-            auth_code = await db.get_and_delete_auth_code(code)
+            # Non-destructive lookup first to validate before consuming
+            auth_code = await db.get_auth_code(code)
             if auth_code is None:
                 logger.warning(
                     "Token rejected: invalid/expired code"
@@ -80,19 +82,36 @@ def create_token_router(
                 return JSONResponse(
                     {"error": "invalid_grant"}, status_code=400
                 )
+            # Atomically consume the code now that client_id is validated
+            auth_code = await db.get_and_delete_auth_code(code)
+            if auth_code is None:
+                # Race: code expired or consumed between lookup and delete
+                return JSONResponse(
+                    {"error": "invalid_grant"}, status_code=400
+                )
             logger.info(
                 "Token issued via auth_code for client_id=%s",
                 client_id,
             )
-            raw_refresh = auth_code["refresh_token"]
+            try:
+                raw_refresh = auth_code["refresh_token"]
+                decrypted_access = encryptor.decrypt(auth_code["access_token"])
+                decrypted_refresh = (
+                    encryptor.decrypt(raw_refresh) if raw_refresh else None
+                )
+            except InvalidToken:
+                logger.error(
+                    "Corrupt encrypted token data for client_id=%s", client_id
+                )
+                return JSONResponse(
+                    {"error": "invalid_grant"}, status_code=400
+                )
             return JSONResponse(
                 {
-                    "access_token": encryptor.decrypt(auth_code["access_token"]),
+                    "access_token": decrypted_access,
                     "token_type": auth_code["token_type"],
                     "expires_in": auth_code["expires_in"],
-                    "refresh_token": (
-                        encryptor.decrypt(raw_refresh) if raw_refresh else None
-                    ),
+                    "refresh_token": decrypted_refresh,
                 },
                 headers={"Cache-Control": "no-store"},
             )

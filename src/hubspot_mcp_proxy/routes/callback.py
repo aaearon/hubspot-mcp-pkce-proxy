@@ -5,6 +5,7 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
 
+from cryptography.fernet import InvalidToken
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse, RedirectResponse
 from starlette.responses import Response
@@ -79,14 +80,22 @@ def create_callback_router(
         )
 
         # Exchange with HubSpot using PKCE verifier (decrypt from storage)
+        try:
+            code_verifier = encryptor.decrypt(auth_state["code_verifier"])
+        except InvalidToken:
+            logger.error(
+                "Corrupt encrypted verifier for state=%s, deleting", state
+            )
+            await db.delete_auth_state(state)
+            return JSONResponse(
+                {"error": "invalid_grant"}, status_code=400
+            )
+
         result = await hub_client.exchange_code(
             code=code,
-            code_verifier=encryptor.decrypt(auth_state["code_verifier"]),
+            code_verifier=code_verifier,
             redirect_uri=f"{settings.proxy_base_url}/callback",
         )
-
-        # Clean up used state
-        await db.delete_auth_state(state)
 
         if result["status_code"] != 200:
             logger.error(
@@ -97,6 +106,9 @@ def create_callback_router(
                 {"error": "hubspot token exchange failed"},
                 status_code=502,
             )
+
+        # Clean up used state only after successful exchange
+        await db.delete_auth_state(state)
 
         token_data = result["data"]
 
