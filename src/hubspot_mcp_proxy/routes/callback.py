@@ -85,9 +85,6 @@ def create_callback_router(
             redirect_uri=f"{settings.proxy_base_url}/callback",
         )
 
-        # Clean up used state
-        await db.delete_auth_state(state)
-
         if result["status_code"] != 200:
             logger.error(
                 "HubSpot token exchange failed: status=%d response=%s",
@@ -97,6 +94,9 @@ def create_callback_router(
                 {"error": "hubspot token exchange failed"},
                 status_code=502,
             )
+
+        # Clean up used state only after successful exchange
+        await db.delete_auth_state(state)
 
         token_data = result["data"]
 

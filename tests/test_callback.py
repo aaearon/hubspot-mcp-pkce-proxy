@@ -73,7 +73,9 @@ class TestCallback:
         assert resp.status_code == 400
 
     @respx.mock
-    def test_callback_hubspot_error_returns_502(self, client, settings, stored_state):
+    async def test_callback_hubspot_error_returns_502(
+        self, client, db, settings, stored_state
+    ):
         respx.post(settings.hubspot_token_url).mock(
             return_value=httpx.Response(401, json={"error": "invalid"})
         )
@@ -83,6 +85,9 @@ class TestCallback:
         )
         assert resp.status_code == 502
         assert "detail" not in resp.json()
+        # State should be preserved so the user can retry
+        remaining = await db.get_auth_state("proxy-state-abc")
+        assert remaining is not None
 
     def test_callback_oauth_error_redirects_to_client(
         self, client, stored_state
