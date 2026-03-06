@@ -62,7 +62,8 @@ def create_token_router(
                     {"error": "invalid_request", "error_description": "code required"},
                     status_code=400,
                 )
-            auth_code = await db.get_and_delete_auth_code(code)
+            # Non-destructive lookup first to validate before consuming
+            auth_code = await db.get_auth_code(code)
             if auth_code is None:
                 logger.warning(
                     "Token rejected: invalid/expired code"
@@ -77,6 +78,13 @@ def create_token_router(
                     " expected=%s got=%s",
                     auth_code["client_id"], client_id,
                 )
+                return JSONResponse(
+                    {"error": "invalid_grant"}, status_code=400
+                )
+            # Atomically consume the code now that client_id is validated
+            auth_code = await db.get_and_delete_auth_code(code)
+            if auth_code is None:
+                # Race: code expired or consumed between lookup and delete
                 return JSONResponse(
                     {"error": "invalid_grant"}, status_code=400
                 )

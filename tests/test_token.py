@@ -184,6 +184,20 @@ class TestToken:
         assert resp.status_code == 400
         assert resp.json()["error"] == "invalid_grant"
 
+        # Code should still be usable by the correct client
+        resp2 = client.post(
+            "/token",
+            data={
+                "grant_type": "authorization_code",
+                "code": info["code"],
+                "client_id": info["client_id"],
+                "client_secret": info["client_secret"],
+                "redirect_uri": "https://copilot.example.com/callback",
+            },
+        )
+        assert resp2.status_code == 200
+        assert resp2.json()["access_token"] == "hs-access-token"
+
     async def test_token_works_with_legacy_sha256_hash(
         self, client, db, encryptor
     ):
