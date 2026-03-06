@@ -142,6 +142,31 @@ class TestCallback:
         assert resp.status_code == 400
 
     @respx.mock
+    async def test_callback_corrupt_verifier_returns_400(
+        self, client, db, settings
+    ):
+        """Corrupt encrypted verifier returns 400, not 500."""
+        expires = (datetime.now(timezone.utc) + timedelta(seconds=600)).isoformat()
+        await db.insert_auth_state(
+            state_key="corrupt-state",
+            code_verifier="not-valid-fernet-ciphertext",
+            client_id="test-client-id",
+            redirect_uri="https://copilot.example.com/callback",
+            copilot_state="copilot-state-xyz",
+            scope="crm.objects.contacts.read",
+            expires_at=expires,
+        )
+        resp = client.get(
+            "/callback",
+            params={"code": "hubspot-auth-code", "state": "corrupt-state"},
+        )
+        assert resp.status_code == 400
+        assert resp.json()["error"] == "invalid_grant"
+        # Corrupt state should be cleaned up
+        remaining = await db.get_auth_state("corrupt-state")
+        assert remaining is None
+
+    @respx.mock
     async def test_callback_stores_encrypted_tokens(
         self, client, db, settings, stored_state, encryptor
     ):

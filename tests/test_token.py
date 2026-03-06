@@ -299,6 +299,60 @@ class TestToken:
         assert resp.status_code == 400
         assert resp.json()["error"] == "invalid_request"
 
+    async def test_corrupt_access_token_returns_400(
+        self, client, db, encryptor, setup_client_and_code
+    ):
+        """Corrupt encrypted access_token returns 400, not 500."""
+        info = setup_client_and_code
+        expires = (datetime.now(timezone.utc) + timedelta(seconds=300)).isoformat()
+        await db.insert_auth_code(
+            code="corrupt-code",
+            access_token="not-valid-fernet",
+            refresh_token=encryptor.encrypt("good-refresh"),
+            token_type="bearer",
+            expires_in=3600,
+            client_id=info["client_id"],
+            expires_at=expires,
+        )
+        resp = client.post(
+            "/token",
+            data={
+                "grant_type": "authorization_code",
+                "code": "corrupt-code",
+                "client_id": info["client_id"],
+                "client_secret": info["client_secret"],
+            },
+        )
+        assert resp.status_code == 400
+        assert resp.json()["error"] == "invalid_grant"
+
+    async def test_corrupt_refresh_token_returns_400(
+        self, client, db, encryptor, setup_client_and_code
+    ):
+        """Corrupt encrypted refresh_token returns 400, not 500."""
+        info = setup_client_and_code
+        expires = (datetime.now(timezone.utc) + timedelta(seconds=300)).isoformat()
+        await db.insert_auth_code(
+            code="corrupt-refresh-code",
+            access_token=encryptor.encrypt("good-access"),
+            refresh_token="not-valid-fernet",
+            token_type="bearer",
+            expires_in=3600,
+            client_id=info["client_id"],
+            expires_at=expires,
+        )
+        resp = client.post(
+            "/token",
+            data={
+                "grant_type": "authorization_code",
+                "code": "corrupt-refresh-code",
+                "client_id": info["client_id"],
+                "client_secret": info["client_secret"],
+            },
+        )
+        assert resp.status_code == 400
+        assert resp.json()["error"] == "invalid_grant"
+
     def test_token_response_cache_control(self, client, setup_client_and_code):
         """Token responses must include Cache-Control: no-store (RFC 6749)."""
         info = setup_client_and_code
