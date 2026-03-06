@@ -54,6 +54,9 @@ docker compose up -d
 - State parameter validated against `[A-Za-z0-9_\-\.~]{1,512}` pattern
 - Only `response_type=code` accepted (implicit grant rejected)
 
+## CI
+GitHub Actions runs on push/PR to `main`: lint (`ruff`), test (`pytest`), and Docker build. See `.github/workflows/ci.yml`.
+
 ## Conventions
 - TDD: write tests before implementation
 - Feature branch workflow: `feat/<phase-name>` branches merged to `main`
